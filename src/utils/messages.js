@@ -1,11 +1,14 @@
 /**
- * messages.js
- * Premium, bank-staff tone. Plain text only.
- * Bold with *asterisks* for WhatsApp formatting.
+ * messages.js — premium bank-staff tone, plain text only.
+ * Bold via *asterisks* for WhatsApp formatting.
  */
 
-/** Format amount — no decimals unless fractional. e.g. 500 → "500", 500.5 → "500.50" */
-const fmt = (n) => (Number.isInteger(n) ? String(n) : n.toFixed(2));
+/** Format: no decimals unless fractional. 500 → "500", 500.5 → "500.50" */
+const fmt = (n) => (Number.isInteger(n) ? String(n) : Number(n).toFixed(2));
+
+/** Build a numbered list string from an array of category names. */
+const categoryList = (cats) =>
+  cats.map((c, i) => `${i + 1}. ${c.name}`).join('\n');
 
 // ─── Onboarding ───────────────────────────────────────────────────────────────
 
@@ -39,12 +42,13 @@ const welcomeMessage = (name, balance) => ({
     `━━━━━━━━━━━━━━━━━━━━━\n` +
     `Here's what you can do:\n\n` +
     `1️⃣  *Add Money* — Deposit funds into your account\n` +
-    `2️⃣  *Withdraw Money* — Debit funds from your account\n\n` +
+    `2️⃣  *Withdraw Money* — Debit funds from your account\n` +
+    `3️⃣  *Manage Categories* — Add or remove categories\n\n` +
     `📌 *Quick Commands*\n` +
     `• Type *BAL* anytime to check your balance\n` +
     `• Type *0* anytime to cancel an operation\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n\n` +
-    `_Reply with 1 or 2 to get started._`,
+    `_Reply with 1, 2, or 3 to get started._`,
 });
 
 // ─── Global shortcuts ─────────────────────────────────────────────────────────
@@ -67,8 +71,6 @@ const cancelledMessage = (balance) => ({
     `_Type *hi* whenever you're ready to continue._`,
 });
 
-// ─── Unrecognised input ───────────────────────────────────────────────────────
-
 const unrecognisedMessage = () => ({
   text:
     `🤔 Hmm, we didn't quite catch that.\n\n` +
@@ -89,11 +91,12 @@ const askAmountMessage = () => ({
     `_Type *0* to cancel this operation._`,
 });
 
-const depositConfirmedMessage = (amount, prevBal, newBal) => ({
+const depositConfirmedMessage = (amount, category, prevBal, newBal) => ({
   text:
     `✅ *Deposit Successful!*\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
     `Amount Deposited:   *₹${fmt(amount)}*\n` +
+    `Category:           *${category}*\n` +
     `Previous Balance:   *₹${fmt(prevBal)}*\n` +
     `Current Balance:    *₹${fmt(newBal)}*\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
@@ -122,11 +125,12 @@ const askDebitAmountMessage = (balance) => ({
     `_Type *0* to cancel this operation._`,
 });
 
-const withdrawConfirmedMessage = (amount, prevBal, newBal) => ({
+const withdrawConfirmedMessage = (amount, category, prevBal, newBal) => ({
   text:
     `✅ *Withdrawal Successful!*\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
     `Amount Withdrawn:   *₹${fmt(amount)}*\n` +
+    `Category:           *${category}*\n` +
     `Previous Balance:   *₹${fmt(prevBal)}*\n` +
     `Current Balance:    *₹${fmt(newBal)}*\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
@@ -140,6 +144,29 @@ const invalidDebitMessage = (balance) => ({
     `Current Balance: *₹${fmt(balance)}*\n\n` +
     `_Type *0* to cancel._`,
 });
+
+// ─── Category selection ───────────────────────────────────────────────────────
+
+const selectCategoryMessage = (cats) => ({
+  text:
+    `🗂️ *Select Category*\n` +
+    `━━━━━━━━━━━━━━━━━━━━━\n` +
+    `Which category does this belong to?\n\n` +
+    `${categoryList(cats)}\n` +
+    `━━━━━━━━━━━━━━━━━━━━━\n` +
+    `_Reply with the category number_\n` +
+    `_Type *0* to cancel_`,
+});
+
+const invalidCategoryMessage = (total) => ({
+  text:
+    `⚠️ *Invalid Selection*\n\n` +
+    `Please reply with a number\n` +
+    `between 1 and ${total}.\n\n` +
+    `_Type *0* to cancel._`,
+});
+
+// ─── Negative balance confirmation ────────────────────────────────────────────
 
 const negativeWarningMessage = (balance, amount) => {
   const deficit = amount - balance;
@@ -161,13 +188,12 @@ const negativeWarningMessage = (balance, amount) => {
   };
 };
 
-// ─── Negative confirm ─────────────────────────────────────────────────────────
-
-const negativeWithdrawConfirmedMessage = (amount, prevBal, newBal) => ({
+const negativeWithdrawConfirmedMessage = (amount, category, prevBal, newBal) => ({
   text:
     `✅ *Withdrawal Confirmed*\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
     `Amount Withdrawn:   *₹${fmt(amount)}*\n` +
+    `Category:           *${category}*\n` +
     `Previous Balance:   *₹${fmt(prevBal)}*\n` +
     `Current Balance:    *₹${fmt(newBal)}*\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
@@ -196,6 +222,64 @@ const needYesOrNoMessage = () => ({
     `*NO* — to cancel and keep your balance safe`,
 });
 
+// ─── Manage Categories ────────────────────────────────────────────────────────
+
+const manageCategoriesMessage = (cats) => ({
+  text:
+    `🗂️ *Your Categories*\n` +
+    `━━━━━━━━━━━━━━━━━━━━━\n` +
+    `${categoryList(cats)}\n` +
+    `━━━━━━━━━━━━━━━━━━━━━\n` +
+    `Type *ADD* to create a new category\n` +
+    `Type *DEL* to delete a category\n` +
+    `Type *0* to go back`,
+});
+
+const askNewCategoryNameMessage = () => ({
+  text:
+    `✏️ *New Category*\n\n` +
+    `What would you like to name\n` +
+    `your new category?\n\n` +
+    `_Type *0* to cancel._`,
+});
+
+const categoryCreatedMessage = (name) => ({
+  text:
+    `✅ *Category Created*\n` +
+    `━━━━━━━━━━━━━━━━━━━━━\n` +
+    `*${name}* has been added to\n` +
+    `your categories.\n` +
+    `━━━━━━━━━━━━━━━━━━━━━\n` +
+    `_Type *hi* to continue._`,
+});
+
+const askDeleteCategoryMessage = (cats) => ({
+  text:
+    `🗑️ *Delete Category*\n` +
+    `━━━━━━━━━━━━━━━━━━━━━\n` +
+    `${categoryList(cats)}\n` +
+    `━━━━━━━━━━━━━━━━━━━━━\n` +
+    `Type the *number* of the category\n` +
+    `you want to delete.\n\n` +
+    `_Type *0* to cancel._`,
+});
+
+const categoryDeletedMessage = (name) => ({
+  text:
+    `✅ *Category Deleted*\n` +
+    `━━━━━━━━━━━━━━━━━━━━━\n` +
+    `*${name}* has been removed.\n` +
+    `━━━━━━━━━━━━━━━━━━━━━\n` +
+    `_Type *hi* to continue._`,
+});
+
+const lastCategoryWarningMessage = () => ({
+  text:
+    `⚠️ You must keep at least\n` +
+    `one category.\n\n` +
+    `_Type *0* to go back._`,
+});
+
 module.exports = {
   askNameMessage,
   nameRegisteredMessage,
@@ -209,8 +293,16 @@ module.exports = {
   askDebitAmountMessage,
   withdrawConfirmedMessage,
   invalidDebitMessage,
+  selectCategoryMessage,
+  invalidCategoryMessage,
   negativeWarningMessage,
   negativeWithdrawConfirmedMessage,
   withdrawCancelledMessage,
   needYesOrNoMessage,
+  manageCategoriesMessage,
+  askNewCategoryNameMessage,
+  categoryCreatedMessage,
+  askDeleteCategoryMessage,
+  categoryDeletedMessage,
+  lastCategoryWarningMessage,
 };
