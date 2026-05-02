@@ -19,9 +19,54 @@ console.error = (...args) => { if (!_isSignalNoise(...args)) _origError(...args)
 
 const _origLog = console.log.bind(console);
 console.log = (...args) => { if (!_isSignalNoise(...args)) _origLog(...args); };
+
+// ─── Dependencies ─────────────────────────────────────────────────────────────
+const express  = require('express');
+const https    = require('https');
+const http     = require('http');
 const mongoose = require('mongoose');
 const { startBot } = require('./src/bot/index');
 
+// ─── Health check + self-ping server ─────────────────────────────────────────
+const app  = express();
+const PORT = process.env.PORT || 3000;
+
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    status:    'alive',
+    uptime:    process.uptime(),
+    timestamp: new Date().toISOString(),
+  });
+});
+
+app.listen(PORT, () => {
+  console.log(`🌐 Server running on port ${PORT}`);
+});
+
+// ─── Self-ping — prevents Render free tier from sleeping ─────────────────────
+function keepAlive() {
+  const url = process.env.RENDER_URL;
+  if (!url) {
+    console.log('⚠️  RENDER_URL not set — skipping keep-alive ping');
+    return;
+  }
+
+  const protocol = url.startsWith('https') ? https : http;
+
+  protocol.get(`${url}/health`, (res) => {
+    console.log(`✅ Keep-alive ping — ${res.statusCode}`);
+  }).on('error', (err) => {
+    console.log(`❌ Ping failed — ${err.message}`);
+  });
+}
+
+// Ping every 10 minutes (600 000 ms)
+setInterval(keepAlive, 10 * 60 * 1000);
+
+// First ping 1 minute after startup (bot needs time to fully initialise)
+setTimeout(keepAlive, 60 * 1000);
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
 async function main() {
   if (!process.env.MONGO_URI) {
     console.error('❌  MONGO_URI is not set in .env — please add it and restart.');

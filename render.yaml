@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: spendbot
+    runtime: node
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: MONGO_URI
+        sync: false
+      - key: RENDER_URL
+        sync: false
+      - key: PORT
+        value: "3000"
