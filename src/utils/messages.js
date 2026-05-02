@@ -1,12 +1,10 @@
 /**
  * messages.js
- * All bot reply payloads.
+ * Plain-text only payloads — the only format that works reliably
+ * with Baileys on personal WhatsApp accounts.
  *
- * List-menu payloads carry a `sections` array — the send() helper in handler.js
- * detects this and passes them through Baileys' list-message path.
- *
- * WhatsApp list-tap responses come back as:
- *   msg.listResponseMessage?.singleSelectReply?.selectedRowId
+ * WhatsApp blocks both buttonsMessage and listMessage for unofficial APIs.
+ * Navigation uses typed numbers: 1 = Add, 2 = Withdraw, 3 = Balance.
  */
 
 // ─── Onboarding ───────────────────────────────────────────────────────────────
@@ -19,40 +17,22 @@ const accountCreatedMessage = (name) => ({
   text: `✅ Account created! Welcome, *${name}*! 🎉\n\nYour current balance is *₹0*`,
 });
 
-// ─── Main menu (3 options) ────────────────────────────────────────────────────
+// ─── Main menu ────────────────────────────────────────────────────────────────
 
-const MENU_SECTIONS = [
-  {
-    title: 'Options',
-    rows: [
-      { title: '➕  Add Money',      rowId: '1', description: 'Deposit funds to your account' },
-      { title: '➖  Withdraw Money', rowId: '2', description: 'Debit funds from your account' },
-      { title: '📊  Check Balance',  rowId: '3', description: 'View your current balance'     },
-    ],
-  },
-];
+const MENU_TEXT = (name) =>
+  `Hey *${name}*! 👋 What would you like to do?\n\n` +
+  `1️⃣  Add Money\n` +
+  `2️⃣  Withdraw Money\n` +
+  `3️⃣  Check Balance\n\n` +
+  `_Reply with *1*, *2*, or *3*_`;
 
-const mainMenuMessage = (name) => ({
-  // `text` becomes the list description; `title` is the header
-  text: `What would you like to do?`,
-  title: `Hey *${name}*! 👋`,
-  footer: 'Expense Tracker Bot 💸',
-  buttonText: 'Open Menu',
-  sections: MENU_SECTIONS,
-});
-
-const backToMenuMessage = (name) => ({
-  text: `What would you like to do next?`,
-  title: `Hey *${name}*! 👋`,
-  footer: 'Expense Tracker Bot 💸',
-  buttonText: 'Open Menu',
-  sections: MENU_SECTIONS,
-});
+const mainMenuMessage  = (name) => ({ text: MENU_TEXT(name) });
+const backToMenuMessage = (name) => ({ text: MENU_TEXT(name) });
 
 // ─── Add Money flow ───────────────────────────────────────────────────────────
 
 const askAmountMessage = () => ({
-  text: '💰 How much would you like to *add*?\n\n_Type the amount in ₹ (e.g. *500*)_',
+  text: '💰 How much would you like to *add*?\n\n_Type the amount in ₹ (e.g. 500)_',
 });
 
 const depositConfirmedMessage = (added, newBal) => ({
@@ -62,7 +42,7 @@ const depositConfirmedMessage = (added, newBal) => ({
 // ─── Withdraw flow ────────────────────────────────────────────────────────────
 
 const askDebitAmountMessage = () => ({
-  text: '💸 How much would you like to *withdraw*?\n\n_Type the amount in ₹ (e.g. *200*)_',
+  text: '💸 How much would you like to *withdraw*?\n\n_Type the amount in ₹ (e.g. 200)_',
 });
 
 const debitConfirmedMessage = (amount, newBal) => ({
@@ -70,7 +50,7 @@ const debitConfirmedMessage = (amount, newBal) => ({
 });
 
 const insufficientBalanceMessage = (available) => ({
-  text: `❌ Insufficient balance!\n\nYou only have *₹${available}* available.`,
+  text: `❌ *Insufficient balance!*\n\nYou only have *₹${available}* available.\n\nEnter a smaller amount:`,
 });
 
 // ─── Check Balance ────────────────────────────────────────────────────────────

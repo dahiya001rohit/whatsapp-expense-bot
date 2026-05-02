@@ -45,19 +45,7 @@ const humanDelay = () =>
  */
 async function send(sock, jid, payload) {
   await humanDelay();
-
-  if (payload.sections) {
-    // List message — renders as a tappable "Open Menu" button in WhatsApp
-    await sock.sendMessage(jid, {
-      text:       payload.text,
-      title:      payload.title       || '',
-      footer:     payload.footer      || '',
-      buttonText: payload.buttonText  || 'Select',
-      sections:   payload.sections,
-    });
-  } else {
-    await sock.sendMessage(jid, { text: payload.text });
-  }
+  await sock.sendMessage(jid, { text: payload.text });
 }
 
 // ─── Main Handler ─────────────────────────────────────────────────────────────
