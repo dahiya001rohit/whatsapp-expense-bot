@@ -38,7 +38,6 @@ const {
   unrecognisedMessage,
   moreMenuMessage,
   spendingReportMessage,
-  noTransactionsMessage,
   manageBudgetsMessage,
   askBudgetAmountMessage,
   budgetSetMessage,
@@ -220,28 +219,27 @@ async function handleMessage(sock, message) {
     case 'more_menu': {
       if (userInput === '1') {
         // ── Spending report ─────────────────────────────────────────────────
-        const rows = await Transaction.aggregate([
-          {
-            $match: {
-              phone,
-              type: 'debit',
-              createdAt: { $gte: startOfMonth() },
-            },
-          },
+        const monthStart = startOfMonth();
+
+        const debitRows = await Transaction.aggregate([
+          { $match: { phone, type: 'debit', createdAt: { $gte: monthStart } } },
           { $group: { _id: '$category', total: { $sum: '$amount' } } },
           { $sort: { total: -1 } },
+        ]);
+
+        const creditRows = await Transaction.aggregate([
+          { $match: { phone, type: 'credit', createdAt: { $gte: monthStart } } },
+          { $group: { _id: null, total: { $sum: '$amount' } } },
         ]);
 
         user.currentStep = 'main_menu';
         await user.save();
 
-        if (rows.length === 0) {
-          await send(sock, jid, noTransactionsMessage());
-        } else {
-          const formatted = rows.map((r) => ({ category: r._id, total: r.total }));
-          const total     = formatted.reduce((s, r) => s + r.total, 0);
-          await send(sock, jid, spendingReportMessage(formatted, total, user.balance));
-        }
+        const totalCredited = creditRows[0]?.total ?? 0;
+        const debitFormatted = debitRows.map((r) => ({ category: r._id, total: r.total }));
+        const totalSpent = debitFormatted.reduce((s, r) => s + r.total, 0);
+
+        await send(sock, jid, spendingReportMessage(totalCredited, debitFormatted, totalSpent, user.balance));
         return; // STOP
 
       } else if (userInput === '2') {
@@ -345,7 +343,7 @@ async function handleMessage(sock, message) {
       return; // STOP
     }
 
-    // ── Add Money: get amount ─────────────────────────────────────────────────
+    // ── Add Money: process directly (no category prompt for credits) ──────────
     case 'awaiting_amount': {
       const amount = parseFloat(userInput);
 
@@ -354,29 +352,20 @@ async function handleMessage(sock, message) {
         return;
       }
 
-      const cats = await getCategories(phone);
-
-      if (cats.length === 0) {
-        const prevBalance = user.balance;
-        user.balance     += amount;
-        user.currentStep  = 'main_menu';
-        user.tempData     = {};
-        user.markModified('tempData');
-        await user.save();
-        await Transaction.create({
-          phone, type: 'credit', amount, category: 'Uncategorised',
-          previousBalance: prevBalance, newBalance: user.balance,
-        });
-        await send(sock, jid, depositConfirmedMessage(amount, 'Uncategorised', prevBalance, user.balance));
-        return; // STOP
-      }
-
-      user.tempData = { pendingAmount: amount, pendingType: 'credit' };
+      const prevBalance = user.balance;
+      user.balance     += amount;
+      user.currentStep  = 'main_menu';
+      user.tempData     = {};
       user.markModified('tempData');
-      user.currentStep = 'awaiting_category';
       await user.save();
-      await send(sock, jid, selectCategoryMessage(cats));
-      return;
+
+      await Transaction.create({
+        phone, type: 'credit', amount, category: 'Credit / Add Money',
+        previousBalance: prevBalance, newBalance: user.balance,
+      });
+
+      await send(sock, jid, depositConfirmedMessage(amount, 'Credit / Add Money', prevBalance, user.balance));
+      return; // STOP
     }
 
     // ── Withdraw: get amount ──────────────────────────────────────────────────
@@ -422,7 +411,7 @@ async function handleMessage(sock, message) {
       return;
     }
 
-    // ── Category selection ────────────────────────────────────────────────────
+    // ── Category selection (debit only) ──────────────────────────────────────
     case 'awaiting_category': {
       const cats  = await getCategories(phone);
       const index = parseInt(userInput, 10);
@@ -432,49 +421,32 @@ async function handleMessage(sock, message) {
         return;
       }
 
-      const category                    = cats[index - 1].name;
-      const { pendingAmount, pendingType } = user.tempData;
+      const category     = cats[index - 1].name;
+      const pendingAmount = user.tempData.pendingAmount;
 
-      if (pendingType === 'credit') {
-        const prevBalance = user.balance;
-        user.balance     += pendingAmount;
-        user.currentStep  = 'main_menu';
-        user.tempData     = {};
+      if (pendingAmount > user.balance) {
+        user.tempData = { pendingAmount, pendingType: 'debit', pendingCategory: category };
         user.markModified('tempData');
+        user.currentStep = 'awaiting_negative_confirm';
         await user.save();
-
-        await Transaction.create({
-          phone, type: 'credit', amount: pendingAmount, category,
-          previousBalance: prevBalance, newBalance: user.balance,
-        });
-        await send(sock, jid, depositConfirmedMessage(pendingAmount, category, prevBalance, user.balance));
-        return; // STOP
-
-      } else {
-        if (pendingAmount > user.balance) {
-          user.tempData = { pendingAmount, pendingType: 'debit', pendingCategory: category };
-          user.markModified('tempData');
-          user.currentStep = 'awaiting_negative_confirm';
-          await user.save();
-          await send(sock, jid, negativeWarningMessage(user.balance, pendingAmount));
-          return;
-        }
-
-        const prevBalance = user.balance;
-        user.balance     -= pendingAmount;
-        user.currentStep  = 'main_menu';
-        user.tempData     = {};
-        user.markModified('tempData');
-        await user.save();
-
-        await Transaction.create({
-          phone, type: 'debit', amount: pendingAmount, category,
-          previousBalance: prevBalance, newBalance: user.balance,
-        });
-        await send(sock, jid, withdrawConfirmedMessage(pendingAmount, category, prevBalance, user.balance));
-        await checkBudgetAlert(sock, jid, phone, category);
-        return; // STOP
+        await send(sock, jid, negativeWarningMessage(user.balance, pendingAmount));
+        return;
       }
+
+      const prevBalance = user.balance;
+      user.balance     -= pendingAmount;
+      user.currentStep  = 'main_menu';
+      user.tempData     = {};
+      user.markModified('tempData');
+      await user.save();
+
+      await Transaction.create({
+        phone, type: 'debit', amount: pendingAmount, category,
+        previousBalance: prevBalance, newBalance: user.balance,
+      });
+      await send(sock, jid, withdrawConfirmedMessage(pendingAmount, category, prevBalance, user.balance));
+      await checkBudgetAlert(sock, jid, phone, category);
+      return; // STOP
     }
 
     // ── Negative balance confirmation ─────────────────────────────────────────

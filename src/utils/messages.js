@@ -112,34 +112,32 @@ const moreMenuMessage = () => ({
 
 // ─── Spending Report ──────────────────────────────────────────────────────────
 
-const spendingReportMessage = (rows, total, balance) => {
-  const lines = rows
-    .map((r) => `${emojiFor(r.category)} ${r.category.padEnd(16)}₹${fmt(r.total)}`)
-    .join('\n');
+const spendingReportMessage = (totalCredited, debitRows, totalSpent, balance) => {
+  const creditSection = totalCredited > 0
+    ? `💳 Credit / Add Money    ₹${fmt(totalCredited)}`
+    : `No deposits this month`;
+
+  const spendSection = debitRows.length > 0
+    ? debitRows.map((r) => `${emojiFor(r.category)} ${r.category.padEnd(20)}₹${fmt(r.total)}`).join('\n')
+    : `No spending recorded this month`;
+
   return {
     text:
       `📊 *Spending Report*\n` +
       `━━━━━━━━━━━━━━━━━━━━━\n` +
-      `Here's your spending breakdown:\n\n` +
-      `${lines}\n` +
+      `💰 *Money Added*\n\n` +
+      `${creditSection}\n\n` +
       `━━━━━━━━━━━━━━━━━━━━━\n` +
-      `💸 *Total Spent:    ₹${fmt(total)}*\n` +
-      `💼 *Balance:        ₹${fmt(balance)}*\n` +
+      `💸 *Money Spent*\n\n` +
+      `${spendSection}\n\n` +
+      `━━━━━━━━━━━━━━━━━━━━━\n` +
+      `💰 Total Credited:   *₹${fmt(totalCredited)}*\n` +
+      `💸 Total Spent:      *₹${fmt(totalSpent)}*\n` +
+      `💼 Balance:          *₹${fmt(balance)}*\n` +
       `━━━━━━━━━━━━━━━━━━━━━\n` +
       `_Type *hi* to continue._`,
   };
 };
-
-const noTransactionsMessage = () => ({
-  text:
-    `📊 *Spending Report*\n` +
-    `━━━━━━━━━━━━━━━━━━━━━\n` +
-    `No transactions recorded yet.\n\n` +
-    `Start by adding a transaction\n` +
-    `to see your spending breakdown.\n` +
-    `━━━━━━━━━━━━━━━━━━━━━\n` +
-    `_Type *hi* to continue._`,
-});
 
 // ─── Manage Budgets ───────────────────────────────────────────────────────────
 
@@ -451,7 +449,6 @@ module.exports = {
   unrecognisedMessage,
   moreMenuMessage,
   spendingReportMessage,
-  noTransactionsMessage,
   manageBudgetsMessage,
   askBudgetAmountMessage,
   budgetSetMessage,
