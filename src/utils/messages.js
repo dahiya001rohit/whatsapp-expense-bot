@@ -3,12 +3,27 @@
  * Bold via *asterisks* for WhatsApp formatting.
  */
 
-/** Format: no decimals unless fractional. 500 → "500", 500.5 → "500.50" */
-const fmt = (n) => (Number.isInteger(n) ? String(n) : Number(n).toFixed(2));
+// ─── Formatters ───────────────────────────────────────────────────────────────
 
-/** Build a numbered list string from an array of category names. */
-const categoryList = (cats) =>
-  cats.map((c, i) => `${i + 1}. ${c.name}`).join('\n');
+/** Amount with comma separators, no decimals unless fractional. */
+const fmt = (n) => {
+  const num  = Number(n);
+  const abs  = Math.abs(num);
+  const str  = Number.isInteger(abs) ? String(Math.round(abs)) : abs.toFixed(2);
+  const parts = str.split('.');
+  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return (num < 0 ? '-' : '') + parts.join('.');
+};
+
+const EMOJIS = {
+  food: '🍕', transport: '🚗', bills: '💡', entertainment: '🎬',
+  shopping: '🛍️', health: '🏥', education: '📚', misc: '📦',
+  uncategorised: '📦',
+};
+const emojiFor = (name) => EMOJIS[name.toLowerCase()] || '📁';
+
+/** Numbered list from category docs. */
+const categoryList = (cats) => cats.map((c, i) => `${i + 1}. ${c.name}`).join('\n');
 
 // ─── Onboarding ───────────────────────────────────────────────────────────────
 
@@ -42,13 +57,13 @@ const welcomeMessage = (name, balance) => ({
     `━━━━━━━━━━━━━━━━━━━━━\n` +
     `Here's what you can do:\n\n` +
     `1️⃣  *Add Money* — Deposit funds into your account\n` +
-    `2️⃣  *Withdraw Money* — Debit funds from your account\n` +
-    `3️⃣  *Manage Categories* — Add or remove categories\n\n` +
+    `2️⃣  *Withdraw Money* — Debit funds from your account\n\n` +
     `📌 *Quick Commands*\n` +
     `• Type *BAL* anytime to check your balance\n` +
+    `• Type *MORE* for reports, budgets & categories\n` +
     `• Type *0* anytime to cancel an operation\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n\n` +
-    `_Reply with 1, 2, or 3 to get started._`,
+    `_Reply with 1 or 2 to get started._`,
 });
 
 // ─── Global shortcuts ─────────────────────────────────────────────────────────
@@ -76,8 +91,155 @@ const unrecognisedMessage = () => ({
     `🤔 Hmm, we didn't quite catch that.\n\n` +
     `Type *hi* to see your options\n` +
     `Type *BAL* to check your balance\n` +
+    `Type *MORE* for reports, budgets & categories\n` +
     `Type *0* to cancel any ongoing operation`,
 });
+
+// ─── MORE menu ────────────────────────────────────────────────────────────────
+
+const moreMenuMessage = () => ({
+  text:
+    `📋 *More Options*\n` +
+    `━━━━━━━━━━━━━━━━━━━━━\n` +
+    `Here's what else you can do:\n\n` +
+    `1️⃣  *Spending Report* — See spending by category\n` +
+    `2️⃣  *Manage Budgets* — Set category spending limits\n` +
+    `3️⃣  *Manage Categories* — Add or remove categories\n\n` +
+    `━━━━━━━━━━━━━━━━━━━━━\n` +
+    `_Reply with 1, 2, or 3_\n` +
+    `_Type *0* to go back_`,
+});
+
+// ─── Spending Report ──────────────────────────────────────────────────────────
+
+const spendingReportMessage = (rows, total, balance) => {
+  const lines = rows
+    .map((r) => `${emojiFor(r.category)} ${r.category.padEnd(16)}₹${fmt(r.total)}`)
+    .join('\n');
+  return {
+    text:
+      `📊 *Spending Report*\n` +
+      `━━━━━━━━━━━━━━━━━━━━━\n` +
+      `Here's your spending breakdown:\n\n` +
+      `${lines}\n` +
+      `━━━━━━━━━━━━━━━━━━━━━\n` +
+      `💸 *Total Spent:    ₹${fmt(total)}*\n` +
+      `💼 *Balance:        ₹${fmt(balance)}*\n` +
+      `━━━━━━━━━━━━━━━━━━━━━\n` +
+      `_Type *hi* to continue._`,
+  };
+};
+
+const noTransactionsMessage = () => ({
+  text:
+    `📊 *Spending Report*\n` +
+    `━━━━━━━━━━━━━━━━━━━━━\n` +
+    `No transactions recorded yet.\n\n` +
+    `Start by adding a transaction\n` +
+    `to see your spending breakdown.\n` +
+    `━━━━━━━━━━━━━━━━━━━━━\n` +
+    `_Type *hi* to continue._`,
+});
+
+// ─── Manage Budgets ───────────────────────────────────────────────────────────
+
+const manageBudgetsMessage = (cats, budgetMap) => {
+  const lines = cats.map((c, i) => {
+    const limit    = budgetMap[c.name];
+    const limitStr = limit != null ? `₹${fmt(limit)}` : 'No limit set';
+    return `${i + 1}. ${c.name.padEnd(16)} Limit: ${limitStr}`;
+  }).join('\n');
+  return {
+    text:
+      `💰 *Manage Budgets*\n` +
+      `━━━━━━━━━━━━━━━━━━━━━\n` +
+      `Set monthly spending limits\n` +
+      `for each category:\n\n` +
+      `${lines}\n` +
+      `━━━━━━━━━━━━━━━━━━━━━\n` +
+      `Type category *number* to set its limit\n` +
+      `Type *CLEAR* + number to remove a limit\n` +
+      `(e.g. CLEAR 4 removes category 4's limit)\n` +
+      `Type *0* to go back`,
+  };
+};
+
+const askBudgetAmountMessage = (categoryName, currentLimit) => ({
+  text:
+    `💰 *Set Budget — ${categoryName}*\n` +
+    `━━━━━━━━━━━━━━━━━━━━━\n` +
+    `Enter the monthly spending limit\n` +
+    `for *${categoryName}*:\n\n` +
+    `Current limit: ${currentLimit != null ? `₹${fmt(currentLimit)}` : 'Not set'}\n\n` +
+    `_Type amount in ₹ — e.g. *2000*_\n` +
+    `_Type *0* to cancel_`,
+});
+
+const budgetSetMessage = (categoryName, limit) => ({
+  text:
+    `✅ *Budget Set*\n` +
+    `━━━━━━━━━━━━━━━━━━━━━\n` +
+    `Monthly limit for *${categoryName}*:\n` +
+    `*₹${fmt(limit)}*\n` +
+    `━━━━━━━━━━━━━━━━━━━━━\n` +
+    `We'll warn you if you exceed\n` +
+    `this limit.\n` +
+    `━━━━━━━━━━━━━━━━━━━━━\n` +
+    `_Type *hi* to continue._`,
+});
+
+const budgetRemovedMessage = (categoryName) => ({
+  text:
+    `✅ *Budget Removed*\n` +
+    `━━━━━━━━━━━━━━━━━━━━━\n` +
+    `Spending limit for *${categoryName}*\n` +
+    `has been removed.\n` +
+    `━━━━━━━━━━━━━━━━━━━━━\n` +
+    `_Type *hi* to continue._`,
+});
+
+const invalidBudgetAmountMessage = () => ({
+  text:
+    `⚠️ Please enter a valid\n` +
+    `amount in ₹.\n` +
+    `_Type *0* to cancel._`,
+});
+
+// ─── Budget alerts (sent after debit) ────────────────────────────────────────
+
+const budgetAlertMessage = (category, limit, totalSpent) => {
+  const over = totalSpent - limit;
+  return {
+    text:
+      `⚠️ *Budget Alert — ${category}*\n` +
+      `━━━━━━━━━━━━━━━━━━━━━\n` +
+      `You've reached or exceeded your\n` +
+      `monthly budget for *${category}*.\n\n` +
+      `Monthly Limit:   ₹${fmt(limit)}\n` +
+      `Total Spent:     ₹${fmt(totalSpent)}\n` +
+      `Over by:         ₹${fmt(over)}\n` +
+      `━━━━━━━━━━━━━━━━━━━━━\n` +
+      `Consider reviewing your spending\n` +
+      `in this category.\n` +
+      `_Type *MORE* then *1* to see full report._`,
+  };
+};
+
+const budgetNoticeMessage = (category, limit, totalSpent) => {
+  const remaining = limit - totalSpent;
+  return {
+    text:
+      `💛 *Budget Notice — ${category}*\n` +
+      `━━━━━━━━━━━━━━━━━━━━━\n` +
+      `You're close to your monthly\n` +
+      `budget for *${category}*.\n\n` +
+      `Monthly Limit:   ₹${fmt(limit)}\n` +
+      `Total Spent:     ₹${fmt(totalSpent)}\n` +
+      `Remaining:       ₹${fmt(remaining)}\n` +
+      `━━━━━━━━━━━━━━━━━━━━━\n` +
+      `_Type *MORE* then *1* to see full report._`,
+  };
+};
 
 // ─── Add Money ────────────────────────────────────────────────────────────────
 
@@ -287,6 +449,16 @@ module.exports = {
   balanceMessage,
   cancelledMessage,
   unrecognisedMessage,
+  moreMenuMessage,
+  spendingReportMessage,
+  noTransactionsMessage,
+  manageBudgetsMessage,
+  askBudgetAmountMessage,
+  budgetSetMessage,
+  budgetRemovedMessage,
+  invalidBudgetAmountMessage,
+  budgetAlertMessage,
+  budgetNoticeMessage,
   askAmountMessage,
   depositConfirmedMessage,
   invalidDepositMessage,
