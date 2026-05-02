@@ -564,12 +564,11 @@ async function handleMessage(sock, message) {
     // ── Reset: choose type ────────────────────────────────────────────────────
     case 'reset_type_confirm': {
       if (userInput === '1') {
-        const cats = await getCategories(phone);
         user.tempData = { resetChoice: 'transactions_only' };
         user.markModified('tempData');
         user.currentStep = 'reset_keep_categories';
         await user.save();
-        await send(sock, jid, resetKeepCategoriesMessage(cats));
+        await send(sock, jid, resetKeepCategoriesMessage());
 
       } else if (userInput === '2') {
         const txCount = await Transaction.countDocuments({ phone });

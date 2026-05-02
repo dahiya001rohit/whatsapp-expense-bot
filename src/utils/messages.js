@@ -404,16 +404,14 @@ const resetTypeMessage = () => ({
     `_Type *0* to cancel_`,
 });
 
-const resetKeepCategoriesMessage = (cats) => ({
+const resetKeepCategoriesMessage = () => ({
   text:
-    `📁 *Keep Categories & Budgets?*\n` +
+    `📁 *Keep Your Data?*\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
-    `Your current categories:\n` +
-    `${cats.map((c, i) => `${i + 1}. ${c.name}`).join('\n')}\n\n` +
     `Would you like to keep your\n` +
     `categories and budget limits?\n\n` +
-    `Reply *YES* to keep them\n` +
-    `Reply *NO* to also clear them\n` +
+    `Reply *YES* to keep both\n` +
+    `Reply *NO* to clear both\n\n` +
     `_Type *0* to cancel_`,
 });
 
