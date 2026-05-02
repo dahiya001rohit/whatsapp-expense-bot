@@ -28,6 +28,7 @@ const User        = require('../models/User');
 const Category    = require('../models/Category');
 const Transaction = require('../models/Transaction');
 const Budget      = require('../models/Budget');
+const ResetLog    = require('../models/ResetLog');
 
 const {
   askNameMessage,
@@ -63,11 +64,28 @@ const {
   askDeleteCategoryMessage,
   categoryDeletedMessage,
   lastCategoryWarningMessage,
+  resetTypeMessage,
+  resetKeepCategoriesMessage,
+  resetFinalConfirmMessage,
+  resetSuccessMessage,
+  fullResetSuccessMessage,
+  resetCancelledMessage,
+  resetConfirmNudgeMessage,
 } = require('../utils/messages');
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const GREETINGS = new Set(['hi', 'hey', 'hello']);
+
+/** Default categories restored on reset. */
+const DEFAULT_CATEGORIES = [
+  'Food', 'Transport', 'Bills', 'Entertainment',
+  'Shopping', 'Health', 'Education', 'Misc',
+];
+
+async function seedCategories(phone) {
+  await Category.insertMany(DEFAULT_CATEGORIES.map((name) => ({ phone, name })));
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -261,6 +279,14 @@ async function handleMessage(sock, message) {
         user.currentStep = 'manage_categories';
         await user.save();
         await send(sock, jid, manageCategoriesMessage(cats));
+
+      } else if (userInput === '4') {
+        // ── Reset ─────────────────────────────────────────────────────────────
+        user.currentStep = 'reset_type_confirm';
+        user.tempData    = {};
+        user.markModified('tempData');
+        await user.save();
+        await send(sock, jid, resetTypeMessage());
 
       } else if (userInput === '0') {
         user.currentStep = 'main_menu';
@@ -532,6 +558,98 @@ async function handleMessage(sock, message) {
       user.currentStep = 'main_menu';
       await user.save();
       await send(sock, jid, categoryDeletedMessage(target.name));
+      return; // STOP
+    }
+
+    // ── Reset: choose type ────────────────────────────────────────────────────
+    case 'reset_type_confirm': {
+      if (userInput === '1') {
+        const cats = await getCategories(phone);
+        user.tempData = { resetChoice: 'transactions_only' };
+        user.markModified('tempData');
+        user.currentStep = 'reset_keep_categories';
+        await user.save();
+        await send(sock, jid, resetKeepCategoriesMessage(cats));
+
+      } else if (userInput === '2') {
+        const txCount = await Transaction.countDocuments({ phone });
+        user.tempData = { resetChoice: 'full', keepCategories: false, keepBudgets: false };
+        user.markModified('tempData');
+        user.currentStep = 'reset_final_confirm';
+        await user.save();
+        await send(sock, jid, resetFinalConfirmMessage('full', false, user.balance, txCount));
+
+      } else {
+        await send(sock, jid, { text: '⚠️ Please reply *1* or *2* to choose a reset type.\n_Type *0* to cancel._' });
+      }
+      break;
+    }
+
+    // ── Reset: keep categories? ───────────────────────────────────────────────
+    case 'reset_keep_categories': {
+      if (inputUpper !== 'YES' && inputUpper !== 'NO') {
+        await send(sock, jid, { text: '⚠️ Please reply *YES* to keep or *NO* to clear.\n_Type *0* to cancel._' });
+        return;
+      }
+
+      const keepCategories = inputUpper === 'YES';
+      const txCount = await Transaction.countDocuments({ phone });
+      user.tempData = { ...user.tempData, keepCategories, keepBudgets: keepCategories };
+      user.markModified('tempData');
+      user.currentStep = 'reset_final_confirm';
+      await user.save();
+      await send(sock, jid, resetFinalConfirmMessage('transactions_only', keepCategories, user.balance, txCount));
+      break;
+    }
+
+    // ── Reset: execute on CONFIRM ─────────────────────────────────────────────
+    case 'reset_final_confirm': {
+      if (inputUpper !== 'CONFIRM') {
+        await send(sock, jid, resetConfirmNudgeMessage());
+        return;
+      }
+
+      const { resetChoice, keepCategories = false, keepBudgets = false } = user.tempData ?? {};
+      const txCount = await Transaction.countDocuments({ phone });
+
+      // Save audit log FIRST — never lost
+      await ResetLog.create({
+        phone,
+        resetType: resetChoice,
+        keptCategories: keepCategories,
+        keptBudgets: keepBudgets,
+        balanceBeforeReset: user.balance,
+        transactionCount: txCount,
+        performedAt: new Date(),
+      });
+
+      await Transaction.deleteMany({ phone });
+
+      if (resetChoice === 'full') {
+        await Category.deleteMany({ phone });
+        await Budget.deleteMany({ phone });
+        await seedCategories(phone);
+        user.balance     = 0;
+        user.name        = null;
+        user.currentStep = 'awaiting_name';
+        user.tempData    = {};
+        user.markModified('tempData');
+        await user.save();
+        await send(sock, jid, fullResetSuccessMessage(txCount));
+
+      } else {
+        if (!keepCategories) {
+          await Category.deleteMany({ phone });
+          await Budget.deleteMany({ phone });
+          await seedCategories(phone);
+        }
+        user.balance     = 0;
+        user.currentStep = 'main_menu';
+        user.tempData    = {};
+        user.markModified('tempData');
+        await user.save();
+        await send(sock, jid, resetSuccessMessage(txCount, keepCategories, keepBudgets));
+      }
       return; // STOP
     }
 
