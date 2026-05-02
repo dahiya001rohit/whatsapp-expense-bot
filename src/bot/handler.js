@@ -1,15 +1,13 @@
 /**
  * handler.js
- * State-machine message router.
- *
- * List-menu selections arrive as rowId strings '1', '2', '3'.
- * Plain text input is still accepted as a fallback.
+ * State-machine message router — plain text only.
  *
  * States:
- *   awaiting_name         → free text (user's name)
- *   main_menu             → list tap: '1' add, '2' withdraw, '3' balance
- *   awaiting_amount       → free text (deposit amount)
- *   awaiting_debit_amount → free text (withdrawal amount, with balance check)
+ *   awaiting_name              → free text (user's name)
+ *   main_menu                  → typed '1' add, '2' withdraw, '3' balance
+ *   awaiting_amount            → free text (deposit amount)
+ *   awaiting_debit_amount      → free text (withdrawal amount)
+ *   awaiting_negative_confirm  → YES / NO to confirm negative-balance withdrawal
  */
 
 const User = require('../models/User');
@@ -23,6 +21,9 @@ const {
   askDebitAmountMessage,
   debitConfirmedMessage,
   insufficientBalanceMessage,
+  negativeBalanceWarningMessage,
+  negativeConfirmedMessage,
+  withdrawalCancelledMessage,
   balanceMessage,
   invalidAmountMessage,
 } = require('../utils/messages');
@@ -33,16 +34,6 @@ const {
 const humanDelay = () =>
   new Promise((r) => setTimeout(r, 1000 + Math.random() * 1000));
 
-/**
- * Send a message — detects list payloads vs plain text automatically.
- *
- * Baileys list-message format: pass `sections` directly on the content object
- * (NOT nested inside a `listMessage` key — that causes "Invalid media type").
- *
- * @param {import('@whiskeysockets/baileys').WASocket} sock
- * @param {string} jid
- * @param {object} payload  from messages.js
- */
 async function send(sock, jid, payload) {
   await humanDelay();
   await sock.sendMessage(jid, { text: payload.text });
@@ -50,45 +41,30 @@ async function send(sock, jid, payload) {
 
 // ─── Main Handler ─────────────────────────────────────────────────────────────
 
-/**
- * Handle a single incoming message event.
- * @param {import('@whiskeysockets/baileys').WASocket} sock
- * @param {object} message  raw Baileys message object
- */
 async function handleMessage(sock, message) {
   const jid = message.key.remoteJid;
 
-  // Ignore groups, status broadcasts, and our own outgoing messages
   if (!jid || jid.endsWith('@g.us') || jid === 'status@broadcast') return;
   if (message.key.fromMe) return;
 
   const msg = message.message;
   if (!msg) return;
 
-  // ── Extract user intent ──────────────────────────────────────────────────
-  // List-menu tap: comes back as selectedRowId ('1', '2', '3')
-  const listRowId = msg.listResponseMessage?.singleSelectReply?.selectedRowId?.trim() ?? null;
-
-  // Typed text (normal conversation or extended text)
-  const textBody = (
+  const userInput = (
     msg.conversation ||
     msg.extendedTextMessage?.text ||
     ''
   ).trim();
 
-  const userInput = listRowId || textBody;
-
-  if (!userInput) return; // ignore media, stickers, reactions, etc.
+  if (!userInput) return;
 
   const phone = jid.split('@')[0];
-
-  // Fetch user first for logging, then re-use below
   let user = await User.findOne({ phone });
   console.log(`📨  [${phone}] step: ${user?.currentStep ?? 'none'} | input: "${userInput}"`);
 
   // ── BRAND-NEW USER ────────────────────────────────────────────────────────
   if (!user) {
-    user = await User.create({ phone, currentStep: 'awaiting_name' });
+    user = await User.create({ phone, currentStep: 'awaiting_name', tempData: {} });
     await send(sock, jid, askNameMessage());
     return;
   }
@@ -98,7 +74,7 @@ async function handleMessage(sock, message) {
 
     // ── Waiting for name ─────────────────────────────────────────────────────
     case 'awaiting_name': {
-      user.name = textBody || userInput; // must be typed text
+      user.name = userInput;
       user.currentStep = 'main_menu';
       await user.save();
 
@@ -109,7 +85,7 @@ async function handleMessage(sock, message) {
 
     // ── Waiting for deposit amount ────────────────────────────────────────────
     case 'awaiting_amount': {
-      const amount = parseFloat(textBody);
+      const amount = parseFloat(userInput);
 
       if (isNaN(amount) || amount <= 0) {
         await send(sock, jid, invalidAmountMessage());
@@ -127,7 +103,7 @@ async function handleMessage(sock, message) {
 
     // ── Waiting for withdrawal amount ─────────────────────────────────────────
     case 'awaiting_debit_amount': {
-      const amount = parseFloat(textBody);
+      const amount = parseFloat(userInput);
 
       if (isNaN(amount) || amount <= 0) {
         await send(sock, jid, invalidAmountMessage());
@@ -135,12 +111,17 @@ async function handleMessage(sock, message) {
       }
 
       if (amount > user.balance) {
-        // Insufficient funds — stay in this step so user can try again
-        await send(sock, jid, insufficientBalanceMessage(user.balance));
-        await send(sock, jid, askDebitAmountMessage());
+        // Would go negative — warn and ask for confirmation
+        user.currentStep = 'awaiting_negative_confirm';
+        user.tempData = { pendingDebit: amount };
+        user.markModified('tempData'); // required for Mongoose to detect Object mutation
+        await user.save();
+
+        await send(sock, jid, negativeBalanceWarningMessage(user.balance, amount));
         return;
       }
 
+      // Safe withdrawal
       user.balance -= amount;
       user.currentStep = 'main_menu';
       await user.save();
@@ -150,7 +131,50 @@ async function handleMessage(sock, message) {
       break;
     }
 
-    // ── Main menu — list tap rowId or typed number ────────────────────────────
+    // ── Waiting for YES / NO on negative-balance withdrawal ───────────────────
+    case 'awaiting_negative_confirm': {
+      const reply = userInput.toUpperCase();
+      const pendingDebit = user.tempData?.pendingDebit;
+
+      if (reply === 'YES') {
+        if (!pendingDebit) {
+          // Edge case: pendingDebit lost somehow — restart debit flow
+          user.currentStep = 'awaiting_debit_amount';
+          user.tempData = {};
+          user.markModified('tempData');
+          await user.save();
+          await send(sock, jid, askDebitAmountMessage());
+          return;
+        }
+
+        user.balance -= pendingDebit;
+        user.currentStep = 'main_menu';
+        user.tempData = {};
+        user.markModified('tempData');
+        await user.save();
+
+        await send(sock, jid, negativeConfirmedMessage(pendingDebit, user.balance));
+        await send(sock, jid, backToMenuMessage(user.name));
+
+      } else if (reply === 'NO') {
+        user.currentStep = 'main_menu';
+        user.tempData = {};
+        user.markModified('tempData');
+        await user.save();
+
+        await send(sock, jid, withdrawalCancelledMessage());
+        await send(sock, jid, backToMenuMessage(user.name));
+
+      } else {
+        // Any other reply — nudge them
+        await send(sock, jid, {
+          text: '⚠️  Please reply *YES* to confirm or *NO* to cancel.',
+        });
+      }
+      break;
+    }
+
+    // ── Main menu — user replies '1', '2', or '3' ────────────────────────────
     case 'main_menu':
     default: {
       if (userInput === '1') {
@@ -168,7 +192,6 @@ async function handleMessage(sock, message) {
         await send(sock, jid, backToMenuMessage(user.name));
 
       } else {
-        // Free text / returning user — just re-show the menu
         await send(sock, jid, mainMenuMessage(user.name));
       }
       break;

@@ -53,6 +53,29 @@ const insufficientBalanceMessage = (available) => ({
   text: `❌ *Insufficient balance!*\n\nYou only have *₹${available}* available.\n\nEnter a smaller amount:`,
 });
 
+// ─── Negative balance confirmation ────────────────────────────────────────────
+
+const negativeBalanceWarningMessage = (balance, amount) => {
+  const deficit = (amount - balance).toFixed(2);
+  return {
+    text:
+      `⚠️  *This will put your account in negative!*\n\n` +
+      `Current balance:    *₹${balance}*\n` +
+      `Withdrawal amount:  *₹${amount}*\n` +
+      `Deficit:            *₹${deficit}*\n\n` +
+      `Reply *YES* to confirm negative balance\n` +
+      `Reply *NO* to cancel`,
+  };
+};
+
+const negativeConfirmedMessage = (amount, newBal) => ({
+  text: `✅ *₹${amount}* withdrawn.\n\n💼 Balance: *₹${newBal.toFixed(2)}* _(negative)_`,
+});
+
+const withdrawalCancelledMessage = () => ({
+  text: '🚫 Withdrawal cancelled.',
+});
+
 // ─── Check Balance ────────────────────────────────────────────────────────────
 
 const balanceMessage = (name, balance) => ({
@@ -75,6 +98,9 @@ module.exports = {
   askDebitAmountMessage,
   debitConfirmedMessage,
   insufficientBalanceMessage,
+  negativeBalanceWarningMessage,
+  negativeConfirmedMessage,
+  withdrawalCancelledMessage,
   balanceMessage,
   invalidAmountMessage,
 };
