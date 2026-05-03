@@ -19,6 +19,7 @@ const pino   = require('pino');
 
 const { useMongoDBAuthState } = require('../utils/mongoAuthState');
 const { handleMessage }       = require('./handler');
+const { initScheduler }       = require('../scheduler/notifications');
 
 // ─── Shared live socket reference ────────────────────────────────────────────
 let _currentSock  = null;
@@ -107,6 +108,7 @@ async function startBot(app) {
       _currentSock = sock;
       _reconnecting = false;
       console.log('\n✅  WhatsApp connected! Bot is running.\n');
+      initScheduler(sock);
     }
 
     if (connection === 'close') {

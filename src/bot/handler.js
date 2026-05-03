@@ -102,6 +102,7 @@ const {
   lendSettleAmountMessage,
   lendFullSettledMessage,
   lendPartialSettledMessage,
+  fmt,
 } = require('../utils/messages');
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -257,6 +258,26 @@ async function handleMessage(sock, message) {
     user = await User.create({ phone, currentStep: 'awaiting_name', tempData: {} });
     await send(sock, jid, askNameMessage());
     return;
+  }
+
+  // ── NUDGE RESPONSE ────────────────────────────────────────────────────────
+  if (user.notifStatus === 'nudge_sent') {
+    if (inputUpper === 'YES') {
+      user.notifStatus = 'none';
+      user.currentStep = 'main_menu';
+      await user.save();
+      await send(sock, jid, welcomeMessage(user.name, user.balance));
+      return;
+    }
+    if (inputUpper === 'NO') {
+      user.notifStatus = 'none';
+      await user.save();
+      await send(sock, jid, { text: `All good! 💪\nYour balance stands at *₹${fmt(user.balance)}*.\n\nCatch you later!\nType *hi* anytime you need me.` });
+      return;
+    }
+    // Any other input — clear nudge status and fall through to normal flow
+    user.notifStatus = 'none';
+    await user.save();
   }
 
   // ── GLOBAL: greeting ──────────────────────────────────────────────────────
@@ -500,8 +521,9 @@ async function handleMessage(sock, message) {
       const amount      = user.tempData?.pendingIncomeAmount ?? 0;
       const prevBalance = user.balance;
       user.balance     += amount;
-      user.currentStep  = 'main_menu';
-      user.tempData     = {};
+      user.currentStep       = 'main_menu';
+      user.tempData          = {};
+      user.lastTransactionAt = new Date();
       user.markModified('tempData');
       await user.save();
       await Transaction.create({
@@ -532,10 +554,11 @@ async function handleMessage(sock, message) {
           await send(sock, jid, negativeWarningMessage(user.balance, amount));
           return;
         }
-        const prevBalance = user.balance;
-        user.balance     -= amount;
-        user.currentStep  = 'main_menu';
-        user.tempData     = {};
+        const prevBalance      = user.balance;
+        user.balance          -= amount;
+        user.currentStep       = 'main_menu';
+        user.tempData          = {};
+        user.lastTransactionAt = new Date();
         user.markModified('tempData');
         await user.save();
         await Transaction.create({
@@ -577,10 +600,11 @@ async function handleMessage(sock, message) {
         return;
       }
 
-      const prevBalance = user.balance;
-      user.balance     -= pendingAmount;
-      user.currentStep  = 'main_menu';
-      user.tempData     = {};
+      const prevBalance      = user.balance;
+      user.balance          -= pendingAmount;
+      user.currentStep       = 'main_menu';
+      user.tempData          = {};
+      user.lastTransactionAt = new Date();
       user.markModified('tempData');
       await user.save();
 
@@ -598,10 +622,11 @@ async function handleMessage(sock, message) {
       const { pendingAmount = 0, pendingCategory = 'Uncategorised' } = user.tempData ?? {};
 
       if (inputUpper === 'YES') {
-        const prevBalance = user.balance;
-        user.balance     -= pendingAmount;
-        user.currentStep  = 'main_menu';
-        user.tempData     = {};
+        const prevBalance      = user.balance;
+        user.balance          -= pendingAmount;
+        user.currentStep       = 'main_menu';
+        user.tempData          = {};
+        user.lastTransactionAt = new Date();
         user.markModified('tempData');
         await user.save();
 

@@ -918,4 +918,5 @@ module.exports = {
   lendSettleAmountMessage,
   lendFullSettledMessage,
   lendPartialSettledMessage,
+  fmt,
 };

@@ -35,6 +35,21 @@ const userSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
+  timezone: {
+    type: String,
+    default: 'Asia/Kolkata',
+  },
+  notifStatus: {
+    type: String,
+    enum: ['none', 'nudge_sent'],
+    default: 'none',
+  },
+  lastNudgeSentAt: {
+    type: Date,
+  },
+  lastTransactionAt: {
+    type: Date,
+  },
 });
 
 module.exports = mongoose.model('User', userSchema);
