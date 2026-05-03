@@ -533,14 +533,19 @@ const askNewCategoryNameMessage = () => ({
     `_Type *0* to cancel._`,
 });
 
-const categoryCreatedMessage = (name) => ({
+const categoryCreatedMessage = (name, cats) => ({
   text:
     `✅ *Category Created*\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
-    `*${name}* has been added to\n` +
-    `your categories.\n` +
+    `*${name}* has been added\n` +
+    `to your categories.\n\n` +
+    `📁 *Your Categories*\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
-    `_Type *hi* to continue._`,
+    `${categoryList(cats)}\n` +
+    `━━━━━━━━━━━━━━━━━━━━━\n` +
+    `Type *ADD* to add another category\n` +
+    `Type *DEL* to delete a category\n` +
+    `Type *0* to go back`,
 });
 
 const askDeleteCategoryMessage = (cats) => ({
@@ -554,13 +559,18 @@ const askDeleteCategoryMessage = (cats) => ({
     `_Type *0* to cancel._`,
 });
 
-const categoryDeletedMessage = (name) => ({
+const categoryDeletedMessage = (name, cats) => ({
   text:
     `✅ *Category Deleted*\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
-    `*${name}* has been removed.\n` +
+    `*${name}* has been removed.\n\n` +
+    `📁 *Your Categories*\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
-    `_Type *hi* to continue._`,
+    `${categoryList(cats)}\n` +
+    `━━━━━━━━━━━━━━━━━━━━━\n` +
+    `Type *ADD* to add a category\n` +
+    `Type *DEL* to delete a category\n` +
+    `Type *0* to go back`,
 });
 
 const lastCategoryWarningMessage = () => ({

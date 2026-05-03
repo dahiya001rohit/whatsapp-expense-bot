@@ -522,6 +522,11 @@ async function handleMessage(sock, message) {
         await user.save();
         await send(sock, jid, askDeleteCategoryMessage(cats));
 
+      } else if (userInput === '0') {
+        user.currentStep = 'main_menu';
+        await user.save();
+        await send(sock, jid, cancelMessage());
+
       } else {
         const cats = await getCategories(phone);
         await send(sock, jid, manageCategoriesMessage(cats));
@@ -531,11 +536,13 @@ async function handleMessage(sock, message) {
 
     // ── Add new category ──────────────────────────────────────────────────────
     case 'awaiting_new_category_name': {
-      await Category.create({ phone, name: userInput.trim() });
-      user.currentStep = 'main_menu';
+      const catName = userInput.trim();
+      await Category.create({ phone, name: catName });
+      const updatedCats = await getCategories(phone);
+      user.currentStep  = 'manage_categories';
       await user.save();
-      await send(sock, jid, categoryCreatedMessage(userInput.trim()));
-      return; // STOP
+      await send(sock, jid, categoryCreatedMessage(catName, updatedCats));
+      break; // stay in manage_categories
     }
 
     // ── Delete category ───────────────────────────────────────────────────────
@@ -555,10 +562,11 @@ async function handleMessage(sock, message) {
 
       const target = cats[index - 1];
       await Category.deleteOne({ _id: target._id });
-      user.currentStep = 'main_menu';
+      const updatedCats = await getCategories(phone);
+      user.currentStep  = 'manage_categories';
       await user.save();
-      await send(sock, jid, categoryDeletedMessage(target.name));
-      return; // STOP
+      await send(sock, jid, categoryDeletedMessage(target.name, updatedCats));
+      break; // stay in manage_categories
     }
 
     // ── Reset: choose type ────────────────────────────────────────────────────
