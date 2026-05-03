@@ -51,19 +51,19 @@ const nameRegisteredMessage = (name) => ({
 
 const welcomeMessage = (name, balance) => ({
   text:
-    `👋 Welcome back, *${name}*!\n\n` +
-    `Here's a quick look at where you stand:\n` +
-    `💼 Current Balance: *₹${fmt(balance)}*\n\n` +
+    `👋 Welcome back, *${name}*!\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
-    `Here's what you can do:\n\n` +
-    `1️⃣  *Add Money* — Deposit funds into your account\n` +
-    `2️⃣  *Withdraw Money* — Debit funds from your account\n\n` +
+    `💼 Balance: *₹${fmt(balance)}*\n` +
+    `━━━━━━━━━━━━━━━━━━━━━\n` +
+    `1️⃣  Add Money\n` +
+    `2️⃣  Withdraw Money\n\n` +
     `📌 *Quick Commands*\n` +
-    `• Type *BAL* anytime to check your balance\n` +
-    `• Type *MORE* for reports, budgets & categories\n` +
-    `• Type *0* anytime to cancel an operation\n` +
-    `━━━━━━━━━━━━━━━━━━━━━\n\n` +
-    `_Reply with 1 or 2 to get started._`,
+    `• *BAL* — Check balance instantly\n` +
+    `• *MORE* — Reports, budgets, categories,\n` +
+    `           lending & borrowing\n` +
+    `• *0* — Cancel anytime\n` +
+    `━━━━━━━━━━━━━━━━━━━━━\n` +
+    `_Reply with 1 or 2 to transact._`,
 });
 
 // ─── Global shortcuts ─────────────────────────────────────────────────────────
@@ -143,7 +143,7 @@ const spendingReportMessage = (creditRows, debitRows, totalCredited, totalSpent,
       `💸 Total Out:   *₹${fmt(totalSpent)}*\n` +
       `💼 Balance:     *₹${fmt(balance)}*\n` +
       `━━━━━━━━━━━━━━━━━━━━━\n` +
-      `_Type *hi* to continue._`,
+      `_Type *hi* for main menu or *MORE* for more options._`,
   };
 };
 
@@ -191,7 +191,7 @@ const budgetSetMessage = (categoryName, limit) => ({
     `We'll warn you if you exceed\n` +
     `this limit.\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
-    `_Type *hi* to continue._`,
+    `_Type *hi* for main menu or *MORE* for more options._`,
 });
 
 const budgetRemovedMessage = (categoryName) => ({
@@ -201,7 +201,7 @@ const budgetRemovedMessage = (categoryName) => ({
     `Spending limit for *${categoryName}*\n` +
     `has been removed.\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
-    `_Type *hi* to continue._`,
+    `_Type *hi* for main menu or *MORE* for more options._`,
 });
 
 const invalidBudgetAmountMessage = () => ({
@@ -268,7 +268,7 @@ const depositConfirmedMessage = (amount, category, prevBal, newBal) => ({
     `Previous Balance:   *₹${fmt(prevBal)}*\n` +
     `Current Balance:    *₹${fmt(newBal)}*\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
-    `_Type *hi* to make another transaction._`,
+    `_Type *hi* for menu or *MORE* for options._`,
 });
 
 const invalidDepositMessage = () => ({
@@ -302,7 +302,7 @@ const withdrawConfirmedMessage = (amount, category, prevBal, newBal) => ({
     `Previous Balance:   *₹${fmt(prevBal)}*\n` +
     `Current Balance:    *₹${fmt(newBal)}*\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
-    `_Type *hi* to make another transaction._`,
+    `_Type *hi* for menu or *MORE* for options._`,
 });
 
 const invalidDebitMessage = (balance) => ({
@@ -368,7 +368,7 @@ const negativeWithdrawConfirmedMessage = (amount, category, prevBal, newBal) => 
     `⚠️ Your account is currently in\n` +
     `a negative balance. Please deposit\n` +
     `funds at your earliest convenience.\n\n` +
-    `_Type *hi* to make another transaction._`,
+    `_Type *hi* for menu or *MORE* for options._`,
 });
 
 const withdrawCancelledMessage = (balance) => ({
@@ -379,7 +379,7 @@ const withdrawCancelledMessage = (balance) => ({
     `to your account.\n\n` +
     `Current Balance: *₹${fmt(balance)}*\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
-    `_Type *hi* whenever you're ready._`,
+    `_Type *hi* for menu or *MORE* for options._`,
 });
 
 const needYesOrNoMessage = () => ({
@@ -732,7 +732,7 @@ const lendGaveConfirmedMessage = (personName, amount, totalOwed, date) => ({
     `Total *${personName}* owes you:\n` +
     `*₹${fmt(totalOwed)}*\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
-    `_Type *hi* to continue._`,
+    `_Type *MORE* → *4* to continue or *hi* for main menu._`,
 });
 
 const lendTookConfirmedMessage = (personName, amount, totalOwed, date) => ({
@@ -745,7 +745,7 @@ const lendTookConfirmedMessage = (personName, amount, totalOwed, date) => ({
     `Total you owe *${personName}*:\n` +
     `*₹${fmt(totalOwed)}*\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
-    `_Type *hi* to continue._`,
+    `_Type *MORE* → *4* to continue or *hi* for main menu._`,
 });
 
 const lendBalancesMessage = (gavePeople, tookPeople, totalOwedToYou, totalYouOwe) => {
@@ -782,7 +782,7 @@ const lendBalancesMessage = (gavePeople, tookPeople, totalOwedToYou, totalYouOwe
       `🔴 Total You Owe:      *₹${fmt(totalYouOwe)}*\n` +
       `💰 Net:                *${netStr}*\n` +
       `━━━━━━━━━━━━━━━━━━━━━\n` +
-      `_Type *hi* to continue._`,
+      `_Type *MORE* → *4* to continue or *hi* for main menu._`,
   };
 };
 
@@ -793,7 +793,7 @@ const lendNoRecordsMessage = () => ({
     `No records yet.\n\n` +
     `Type *MORE* then *4* to add one.\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
-    `_Type *hi* to continue._`,
+    `_Type *MORE* → *4* to add one or *hi* for main menu._`,
 });
 
 const lendSettleSelectMessage = (people) => {
@@ -822,7 +822,7 @@ const lendAllClearMessage = () => ({
     `No outstanding balances.\n` +
     `Everyone is settled up! 🎉\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
-    `_Type *hi* to continue._`,
+    `_Type *hi* for main menu or *MORE* for more options._`,
 });
 
 const lendSettleAmountMessage = (personName, totalAmount) => ({
@@ -844,7 +844,7 @@ const lendFullSettledMessage = (personName, amount, date) => ({
     `📅 Settled: ${date}\n\n` +
     `All dues cleared! 🎉\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
-    `_Type *hi* to continue._`,
+    `_Type *MORE* → *4* to continue or *hi* for main menu._`,
 });
 
 const lendPartialSettledMessage = (personName, partial, remaining, date) => ({
@@ -855,7 +855,7 @@ const lendPartialSettledMessage = (personName, partial, remaining, date) => ({
     `📅 Date: ${date}\n\n` +
     `Remaining: *₹${fmt(remaining)}*\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
-    `_Type *hi* to continue._`,
+    `_Type *MORE* → *4* to continue or *hi* for main menu._`,
 });
 
 module.exports = {

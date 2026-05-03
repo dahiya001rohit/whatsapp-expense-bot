@@ -275,6 +275,8 @@ async function handleMessage(sock, message) {
 
   // ── GLOBAL: MORE ──────────────────────────────────────────────────────────
   if (inputUpper === 'MORE') {
+    user.tempData = { ...user.tempData, previousStep: user.currentStep };
+    user.markModified('tempData');
     user.currentStep = 'more_menu';
     await user.save();
     await send(sock, jid, moreMenuMessage());
@@ -387,9 +389,12 @@ async function handleMessage(sock, message) {
         await send(sock, jid, resetTypeMessage());
 
       } else if (userInput === '0') {
-        user.currentStep = 'main_menu';
+        const prevStep = user.tempData?.previousStep;
+        user.currentStep = (prevStep && prevStep !== 'more_menu') ? prevStep : 'main_menu';
+        user.tempData    = {};
+        user.markModified('tempData');
         await user.save();
-        await send(sock, jid, cancelledMessage(user.balance));
+        await send(sock, jid, { text: `❌ *Cancelled.*\n\nType *hi* for main menu.` });
         return;
 
       } else {
