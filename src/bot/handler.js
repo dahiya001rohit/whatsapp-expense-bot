@@ -92,9 +92,27 @@ async function seedCategories(phone) {
 const humanDelay = () =>
   new Promise((r) => setTimeout(r, 1000 + Math.random() * 1000));
 
-async function send(sock, jid, payload) {
+async function send(_sock, jid, payload) {
   await humanDelay();
-  await sock.sendMessage(jid, { text: payload.text });
+
+  // Always use the most recently connected socket, not the one captured at
+  // message-receipt time (which may have closed mid-reconnect cycle).
+  const { getSocket } = require('./index');
+  const live = getSocket() || _sock;
+
+  try {
+    await live.sendMessage(jid, { text: payload.text });
+  } catch (err) {
+    // If the connection closed between reading the message and sending the
+    // reply, wait briefly for the reconnect then try once more.
+    if (err?.message?.includes('Connection Closed') || err?.message?.includes('Timed Out')) {
+      await new Promise((r) => setTimeout(r, 5000));
+      const retrySocket = getSocket() || _sock;
+      await retrySocket.sendMessage(jid, { text: payload.text });
+    } else {
+      throw err;
+    }
+  }
 }
 
 /** Fetch categories for a phone, ordered by creation time. */

@@ -4,6 +4,7 @@
  * Baileys WhatsApp connection.
  * Auth state is persisted to MongoDB (survives Render restarts).
  * Exposes GET /qr — an HTML page with a scannable QR code image.
+ * Exports getSocket() so handler.js always uses the live connection.
  * Delegates all message handling to handler.js.
  */
 
@@ -19,6 +20,16 @@ const pino   = require('pino');
 const { useMongoDBAuthState } = require('../utils/mongoAuthState');
 const { handleMessage }       = require('./handler');
 
+// ─── Shared live socket reference ────────────────────────────────────────────
+// Always points to the most recently created, active Baileys socket.
+// handler.js reads this via getSocket() at send-time, so it never uses a stale
+// socket from a previous reconnect cycle.
+let _currentSock = null;
+
+function getSocket() {
+  return _currentSock;
+}
+
 // ─── QR state (in-memory, refreshed on each new code) ────────────────────────
 let currentQR = null;
 
@@ -27,19 +38,18 @@ let currentQR = null;
 async function startBot(app) {
 
   // ── /qr endpoint — serve QR as a scannable HTML image ──────────────────────
-  if (app) {
+  if (app && !app._qrRouteRegistered) {
+    app._qrRouteRegistered = true;
+
     app.get('/qr', async (req, res) => {
       if (!currentQR) {
         return res.status(200).send(`
-          <!DOCTYPE html>
-          <html>
+          <!DOCTYPE html><html>
             <head>
               <title>SpendBot — QR</title>
               <meta http-equiv="refresh" content="5">
-              <style>
-                body { font-family: sans-serif; text-align: center;
-                       padding: 60px; background: #111; color: #eee; }
-              </style>
+              <style>body{font-family:sans-serif;text-align:center;padding:60px;
+                background:#111;color:#eee}</style>
             </head>
             <body>
               <h2>✅ Bot already connected — no QR needed.</h2>
@@ -53,22 +63,19 @@ async function startBot(app) {
       try {
         const dataUrl = await QRCode.toDataURL(currentQR, { width: 400 });
         res.status(200).send(`
-          <!DOCTYPE html>
-          <html>
+          <!DOCTYPE html><html>
             <head>
               <title>SpendBot — Scan QR</title>
               <meta http-equiv="refresh" content="20">
-              <style>
-                body { font-family: sans-serif; text-align: center;
-                       padding: 60px; background: #111; color: #eee; }
-                img  { border: 8px solid white; border-radius: 12px; }
-              </style>
+              <style>body{font-family:sans-serif;text-align:center;padding:60px;
+                background:#111;color:#eee}
+                img{border:8px solid white;border-radius:12px}</style>
             </head>
             <body>
               <h2>📱 Scan with WhatsApp</h2>
               <p>Open WhatsApp → Linked Devices → Link a Device</p>
               <img src="${dataUrl}" alt="QR Code" />
-              <p style="color:#aaa; font-size:0.85rem">
+              <p style="color:#aaa;font-size:0.85rem">
                 Page auto-refreshes every 20 s. QR expires ~60 s after generation.
               </p>
             </body>
@@ -95,19 +102,23 @@ async function startBot(app) {
     browser: ['SpendBot', 'Chrome', '1.0.0'],
   });
 
+  // Update the shared reference immediately
+  _currentSock = sock;
+
   // ── Persist credentials whenever they change ───────────────────────────────
   sock.ev.on('creds.update', saveCreds);
 
   // ── QR / connection events ─────────────────────────────────────────────────
   sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
     if (qr) {
-      currentQR = qr; // store for /qr endpoint
+      currentQR = qr;
       const renderUrl = process.env.RENDER_URL || `http://localhost:${process.env.PORT || 3000}`;
       console.log(`\n📱  QR ready — open this URL to scan:\n    ${renderUrl}/qr\n`);
     }
 
     if (connection === 'open') {
-      currentQR = null; // clear QR once connected
+      currentQR      = null;
+      _currentSock   = sock; // confirm this socket is now live
       console.log('\n✅  WhatsApp connected! Bot is running.\n');
     }
 
@@ -144,4 +155,4 @@ async function startBot(app) {
   return sock;
 }
 
-module.exports = { startBot };
+module.exports = { startBot, getSocket };
