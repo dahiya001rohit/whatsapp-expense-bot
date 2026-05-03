@@ -33,4 +33,6 @@ const transactionSchema = new mongoose.Schema({
   },
 });
 
+transactionSchema.index({ phone: 1, createdAt: 1 });
+
 module.exports = mongoose.model('Transaction', transactionSchema);

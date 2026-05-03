@@ -229,6 +229,7 @@ async function handleMessage(sock, message) {
       user.name        = userInput;
       user.currentStep = 'main_menu';
       await user.save();
+      await seedCategories(phone);
       await send(sock, jid, nameRegisteredMessage(user.name));
       return; // STOP
     }
@@ -313,7 +314,7 @@ async function handleMessage(sock, message) {
         return;
 
       } else {
-        await send(sock, jid, { text: '⚠️  Please reply with *1*, *2*, or *3*.\n_Type *0* to go back._' });
+        await send(sock, jid, { text: '⚠️  Please reply with *1*, *2*, *3*, or *4*.\n_Type *0* to go back._' });
       }
       break;
     }
@@ -543,7 +544,7 @@ async function handleMessage(sock, message) {
       } else if (userInput === '0') {
         user.currentStep = 'main_menu';
         await user.save();
-        await send(sock, jid, cancelMessage());
+        await send(sock, jid, cancelledMessage());
 
       } else {
         const cats = await getCategories(phone);
@@ -555,6 +556,21 @@ async function handleMessage(sock, message) {
     // ── Add new category ──────────────────────────────────────────────────────
     case 'awaiting_new_category_name': {
       const catName = userInput.trim();
+
+      if (catName.length === 0) {
+        await send(sock, jid, {
+          text: '⚠️ Category name cannot be empty.\n\nPlease enter a valid name:\n_Type *0* to cancel_',
+        });
+        return;
+      }
+
+      if (catName.length > 30) {
+        await send(sock, jid, {
+          text: '⚠️ Category name too long.\n\nPlease keep it under 30 characters:\n_Type *0* to cancel_',
+        });
+        return;
+      }
+
       await Category.create({ phone, name: catName });
       const updatedCats = await getCategories(phone);
       user.currentStep  = 'manage_categories';
