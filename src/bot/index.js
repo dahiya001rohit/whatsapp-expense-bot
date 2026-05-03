@@ -110,35 +110,34 @@ async function startBot(app) {
     }
 
     if (connection === 'close') {
-      const statusCode      = lastDisconnect?.error?.output?.statusCode;
-      const loggedOut       = statusCode === DisconnectReason.loggedOut;
-      // code 440 = connectionReplaced — another session opened for this account.
-      // This fires during Render rolling deploys when old & new processes overlap.
-      const conflict        = statusCode === 440;
+      const statusCode = lastDisconnect?.error?.output?.statusCode;
+      const loggedOut  = statusCode === DisconnectReason.loggedOut;
+      // 440 = connectionReplaced — a newer session/deploy took over this account.
+      // Reconnecting would just kick the new session back, creating an infinite loop.
+      // Accept the handoff gracefully and stop.
+      const conflict   = statusCode === 440;
 
-      console.log(`⚠️  Connection closed (code ${statusCode ?? 'unknown'}).`);
-
-      if (loggedOut) {
-        console.log('Logged out — clear the AuthSession collection in MongoDB and restart.');
-        return;
+      if (loggedOut || conflict) {
+        const reason = loggedOut
+          ? 'Logged out — clear AuthSession in MongoDB and restart.'
+          : 'Session replaced by a newer connection — this instance will stop reconnecting.';
+        console.log(`⚠️  Connection closed (code ${statusCode}). ${reason}`);
+        return; // do NOT reconnect
       }
 
-      // Prevent the reconnect loop: skip if a reconnect is already scheduled
+      // Real network failure — reconnect once, guarded
+      console.log(`⚠️  Connection closed (code ${statusCode ?? 'unknown'}). Reconnecting in 5s…`);
+
       if (_reconnecting) {
-        console.log('Reconnect already pending — skipping duplicate.');
+        console.log('Reconnect already pending — skipping.');
         return;
       }
 
       _reconnecting = true;
-
-      // For conflict (440), wait longer so the old process fully exits first
-      const delay = conflict ? 15000 : 3000;
-      console.log(`Reconnecting in ${delay / 1000}s…`);
-
       setTimeout(async () => {
         _reconnecting = false;
         await startBot(app);
-      }, delay);
+      }, 5000);
     }
   });
 
