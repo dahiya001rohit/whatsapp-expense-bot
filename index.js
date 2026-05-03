@@ -81,7 +81,7 @@ async function main() {
     process.exit(1);
   }
 
-  await startBot();
+  await startBot(app);
 }
 
 main();
