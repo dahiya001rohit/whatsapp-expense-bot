@@ -270,6 +270,21 @@ async function sendNudgeTimeout(sock) {
 let _sock               = null;
 let schedulerInitialized = false;
 
+function testTimezone() {
+    const testUser = { 
+        timezone: 'Asia/Kolkata' 
+    }
+    console.log('🕐 Current hour IST:', 
+        getCurrentHour(testUser.timezone))
+    console.log('🕐 Current time IST:', 
+        new Intl.DateTimeFormat('en-US', {
+            timeZone: 'Asia/Kolkata',
+            hour: 'numeric',
+            minute: 'numeric',
+            hour12: true
+        }).format(new Date()))
+}
+
 function initScheduler(sock) {
   _sock = sock; // always update to latest socket
 
@@ -278,9 +293,11 @@ function initScheduler(sock) {
     return;
   }
   schedulerInitialized = true;
+  testTimezone();
 
   cron.schedule('0 * * * *', async () => {
     if (!_sock) return;
+    console.log('⏰ Cron fired at:', new Date().toISOString());
     console.log('⏰ Hourly cron tick');
     await sendMorningBriefing(_sock);
     await sendNightSummary(_sock);
