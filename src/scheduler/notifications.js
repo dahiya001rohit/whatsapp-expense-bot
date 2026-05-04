@@ -88,7 +88,7 @@ async function sendMorningBriefing(sock) {
 
   for (const user of users) {
     try {
-      if (getCurrentHour(user.timezone) !== 9) continue;
+      if (getCurrentHour(user.timezone) !== 11) continue;
 
       const startOfMonth    = getStartOfMonth(user.timezone);
       const [monthlyAgg]    = await Transaction.aggregate([
@@ -214,7 +214,7 @@ async function sendInactivityNudge(sock) {
   for (const user of users) {
     try {
       const hour = getCurrentHour(user.timezone);
-      if (![9, 13, 17, 21].includes(hour)) continue;
+      if (![9, 11, 13, 17, 21].includes(hour)) continue;
 
       const message =
         `Hey *${user.name}*! 👋\n\n` +
