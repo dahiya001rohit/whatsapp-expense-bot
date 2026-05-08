@@ -3,6 +3,7 @@ services:
     name: spendbot
     runtime: node
     buildCommand: npm install
+    testCommand: npm test
     startCommand: npm start
     healthCheckPath: /health
     envVars:
