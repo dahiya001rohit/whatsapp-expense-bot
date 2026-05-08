@@ -27,6 +27,10 @@ const transactionSchema = new mongoose.Schema({
     type: Number,
     required: true,
   },
+  note: {
+    type: String,
+    default: '',
+  },
   createdAt: {
     type: Date,
     default: Date.now,

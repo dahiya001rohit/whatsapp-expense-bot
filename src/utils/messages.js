@@ -106,9 +106,10 @@ const moreMenuMessage = () => ({
     `2️⃣  *Manage Budgets* — Set category spending limits\n` +
     `3️⃣  *Manage Categories* — Add or remove categories\n` +
     `4️⃣  *Lending & Borrowing* — Track loans and dues\n` +
-    `5️⃣  *Reset Account* — Clear your account data\n\n` +
+    `5️⃣  *Reset Account* — Clear your account data\n` +
+    `6️⃣  *Transaction History* — View last 10 transactions\n\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
-    `_Reply with 1, 2, 3, 4, or 5_\n` +
+    `_Reply with 1, 2, 3, 4, 5, or 6_\n` +
     `_Type *0* to go back_`,
 });
 
@@ -858,6 +859,42 @@ const lendPartialSettledMessage = (personName, partial, remaining, date) => ({
     `_Type *MORE* → *4* to continue or *hi* for main menu._`,
 });
 
+// ─── Transaction History ──────────────────────────────────────────────────────
+
+const TXN_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+const transactionHistoryMessage = (transactions) => {
+  if (!transactions || transactions.length === 0) {
+    return { text: `📋 *No transactions yet.*\n\nType *hi* for main menu.` };
+  }
+  const lines = transactions.map((txn, i) => {
+    const d    = new Date(txn.createdAt);
+    const day  = String(d.getDate()).padStart(2, '0');
+    const mon  = TXN_MONTHS[d.getMonth()];
+    const icon = txn.type === 'credit' ? '💰' : '💸';
+    const sign = txn.type === 'credit' ? '+' : '-';
+    let line = `${i + 1}. ${day} ${mon} — ${icon} ${txn.category}   *${sign}₹${fmt(txn.amount)}*   bal ₹${fmt(txn.newBalance)}`;
+    if (txn.note) line += `\n   _${txn.note}_`;
+    return line;
+  });
+  return {
+    text:
+      `📋 *Recent Transactions:*\n` +
+      `━━━━━━━━━━━━━━━━━━━━━\n` +
+      lines.join('\n') +
+      `\n━━━━━━━━━━━━━━━━━━━━━\n` +
+      `_Type *hi* for main menu._`,
+  };
+};
+
+const askDebitNoteMessage = () => ({
+  text: `📝 Add a note? _(e.g. 'lunch at office')_\n\nOr type *SKIP* to skip.`,
+});
+
+const askCreditNoteMessage = () => ({
+  text: `📝 Add a note? _(e.g. 'monthly salary')_\n\nOr type *SKIP* to skip.`,
+});
+
 module.exports = {
   askNameMessage,
   nameRegisteredMessage,
@@ -918,5 +955,8 @@ module.exports = {
   lendSettleAmountMessage,
   lendFullSettledMessage,
   lendPartialSettledMessage,
+  transactionHistoryMessage,
+  askDebitNoteMessage,
+  askCreditNoteMessage,
   fmt,
 };

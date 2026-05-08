@@ -23,27 +23,27 @@ const emojiForCategory = (name) => EMOJIS[name?.toLowerCase()] || '📁';
 
 // ─── Timezone helpers ─────────────────────────────────────────────────────────
 
+// Returns the difference (UTC ms - TZ-local ms) for the current moment.
+// For UTC+5:30 (IST) this is -19800000; for UTC-8 (PST) it is +28800000.
+function getTzOffsetMs(timezone) {
+  const now = new Date();
+  const utc = new Date(now.toLocaleString('en-US', { timeZone: 'UTC' }));
+  const tz  = new Date(now.toLocaleString('en-US', { timeZone: timezone }));
+  return utc - tz;
+}
+
 function getStartOfDay(timezone) {
-  const formatter = new Intl.DateTimeFormat('en-US', {
-    timeZone: timezone,
-    year: 'numeric', month: '2-digit', day: '2-digit',
-  });
-  const parts = formatter.formatToParts(new Date());
-  const year  = parts.find((p) => p.type === 'year').value;
-  const month = parts.find((p) => p.type === 'month').value;
-  const day   = parts.find((p) => p.type === 'day').value;
-  return new Date(`${year}-${month}-${day}T00:00:00`);
+  // en-CA gives YYYY-MM-DD in the target timezone
+  const dateStr     = new Date().toLocaleDateString('en-CA', { timeZone: timezone });
+  const midnightUtc = new Date(`${dateStr}T00:00:00Z`);
+  return new Date(midnightUtc.getTime() + getTzOffsetMs(timezone));
 }
 
 function getStartOfMonth(timezone) {
-  const formatter = new Intl.DateTimeFormat('en-US', {
-    timeZone: timezone,
-    year: 'numeric', month: '2-digit',
-  });
-  const parts = formatter.formatToParts(new Date());
-  const year  = parts.find((p) => p.type === 'year').value;
-  const month = parts.find((p) => p.type === 'month').value;
-  return new Date(`${year}-${month}-01T00:00:00`);
+  const dateStr       = new Date().toLocaleDateString('en-CA', { timeZone: timezone });
+  const [year, month] = dateStr.split('-');
+  const midnightUtc   = new Date(`${year}-${month}-01T00:00:00Z`);
+  return new Date(midnightUtc.getTime() + getTzOffsetMs(timezone));
 }
 
 function getCurrentHour(timezone) {
@@ -88,7 +88,7 @@ async function sendMorningBriefing(sock) {
 
   for (const user of users) {
     try {
-      if (getCurrentHour(user.timezone) !== 11) continue;
+      if (getCurrentHour(user.timezone) !== 9) continue;
 
       const startOfMonth    = getStartOfMonth(user.timezone);
       const [monthlyAgg]    = await Transaction.aggregate([
@@ -214,7 +214,7 @@ async function sendInactivityNudge(sock) {
   for (const user of users) {
     try {
       const hour = getCurrentHour(user.timezone);
-      if (![9, 11, 13, 17, 21].includes(hour)) continue;
+      if (![9, 13, 17, 21].includes(hour)) continue;
 
       const message =
         `Hey *${user.name}*! 👋\n\n` +
@@ -270,21 +270,6 @@ async function sendNudgeTimeout(sock) {
 let _sock               = null;
 let schedulerInitialized = false;
 
-function testTimezone() {
-    const testUser = { 
-        timezone: 'Asia/Kolkata' 
-    }
-    console.log('🕐 Current hour IST:', 
-        getCurrentHour(testUser.timezone))
-    console.log('🕐 Current time IST:', 
-        new Intl.DateTimeFormat('en-US', {
-            timeZone: 'Asia/Kolkata',
-            hour: 'numeric',
-            minute: 'numeric',
-            hour12: true
-        }).format(new Date()))
-}
-
 function initScheduler(sock) {
   _sock = sock; // always update to latest socket
 
@@ -293,11 +278,9 @@ function initScheduler(sock) {
     return;
   }
   schedulerInitialized = true;
-  testTimezone();
 
   cron.schedule('0 * * * *', async () => {
     if (!_sock) return;
-    console.log('⏰ Cron fired at:', new Date().toISOString());
     console.log('⏰ Hourly cron tick');
     await sendMorningBriefing(_sock);
     await sendNightSummary(_sock);

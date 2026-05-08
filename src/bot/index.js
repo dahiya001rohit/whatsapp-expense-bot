@@ -25,6 +25,19 @@ const { initScheduler }       = require('../scheduler/notifications');
 let _currentSock  = null;
 let _reconnecting = false; // guard — only one pending reconnect at a time
 
+// ─── Message deduplication (60s TTL) ─────────────────────────────────────────
+const _seenIds = new Map();
+
+function isDuplicate(id) {
+  const now = Date.now();
+  for (const [k, ts] of _seenIds) {
+    if (now - ts > 60_000) _seenIds.delete(k);
+  }
+  if (_seenIds.has(id)) return true;
+  _seenIds.set(id, now);
+  return false;
+}
+
 function getSocket() {
   return _currentSock;
 }
@@ -148,6 +161,7 @@ async function startBot(app) {
     if (type !== 'notify') return;
 
     for (const message of messages) {
+      if (!message.key.id || isDuplicate(message.key.id)) continue;
       try {
         await handleMessage(sock, message);
       } catch (err) {
