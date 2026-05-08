@@ -123,7 +123,7 @@ const invalidCategoryMessage = (total) => ({
 });
 
 /**
- * Paginated 5-at-a-time category selection for debit flow.
+ * Paginated 10-at-a-time category selection for debit flow.
  * @param {Array}  cats        [{name}] — the slice for this page
  * @param {number} page        1-indexed
  * @param {number} totalPages

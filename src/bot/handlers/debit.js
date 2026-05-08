@@ -19,7 +19,7 @@ const {
   withdrawCancelledMessage, needYesOrNoMessage,
 } = require('../../utils/messages');
 
-const CAT_PAGE_SIZE = 5;
+const CAT_PAGE_SIZE = 10;
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
