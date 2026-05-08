@@ -102,18 +102,17 @@ const moreMenuMessage = () => ({
     `📋 *More Options*\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
     `Here's what else you can do:\n\n` +
-    `1️⃣  *Spending Report* — See spending by category\n` +
-    `2️⃣  *Manage Budgets* — Set category spending limits\n` +
-    `3️⃣  *Manage Categories* — Add or remove categories\n` +
-    `4️⃣  *Lending & Borrowing* — Track loans and dues\n` +
-    `5️⃣  *Reset Account* — Clear your account data\n` +
-    `6️⃣  *Transaction History* — View last 10 transactions\n\n` +
+    `1️⃣  *Smart Insights* — Monthly summary & trends\n` +
+    `2️⃣  *Transaction History* — Browse by date\n` +
+    `3️⃣  *Categories & Budgets* — Manage your data\n` +
+    `4️⃣  *Lending & Borrowing* — Track loans\n\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
-    `_Reply with 1, 2, 3, 4, 5, or 6_\n` +
-    `_Type *0* to go back_`,
+    `_Reply with 1, 2, 3, or 4_\n` +
+    `_Type *0* to go back_\n` +
+    `_Type *RESET* anytime to reset your data_`,
 });
 
-// ─── Spending Report ──────────────────────────────────────────────────────────
+// ─── Smart Insights ───────────────────────────────────────────────────────────
 
 const INCOME_EMOJIS = {
   salary: '💼', freelance: '💻', family: '👨‍👩‍👧', stipend: '🎓',
@@ -121,6 +120,7 @@ const INCOME_EMOJIS = {
 };
 const incomeEmojiFor = (name) => INCOME_EMOJIS[name.toLowerCase()] || '💰';
 
+/** Legacy — kept for backward compat if still referenced anywhere. */
 const spendingReportMessage = (creditRows, debitRows, totalCredited, totalSpent, balance) => {
   const creditSection = creditRows.length > 0
     ? creditRows.map((r) => `${incomeEmojiFor(r.category)} ${r.category.padEnd(20)}₹${fmt(r.total)}`).join('\n')
@@ -147,6 +147,161 @@ const spendingReportMessage = (creditRows, debitRows, totalCredited, totalSpent,
       `_Type *hi* for main menu or *MORE* for more options._`,
   };
 };
+
+/**
+ * Smart Insights main card.
+ * @param {string} monthLabel  e.g. "May 2026"
+ * @param {number} totalIn
+ * @param {number} totalOut
+ * @param {Array}  incomeRows  [{ category, total }] sorted desc
+ * @param {Array}  debitRows   [{ category, total }] sorted desc
+ */
+const smartInsightsMessage = (monthLabel, totalIn, totalOut, incomeRows, debitRows) => {
+  const net    = totalIn - totalOut;
+  const netStr = net >= 0 ? `+₹${fmt(net)}` : `-₹${fmt(Math.abs(net))}`;
+
+  const incomeSection = incomeRows.length > 0
+    ? incomeRows.map((r) => {
+        const label = (incomeEmojiFor(r.category) + ' ' + r.category).padEnd(14);
+        return `${label} ₹${fmt(r.total)}`;
+      }).join('\n')
+    : `No income this month`;
+
+  const topN  = debitRows.slice(0, 5);
+  const spendSection = topN.length > 0
+    ? topN.map((r) => {
+        const pct   = totalOut > 0 ? Math.round((r.total / totalOut) * 100) : 0;
+        const label = (emojiFor(r.category) + ' ' + r.category).padEnd(14);
+        return `${label} ₹${fmt(r.total)}  ${pct}%`;
+      }).join('\n')
+    : `No spending this month`;
+
+  return {
+    text:
+      `📊 *${monthLabel}*\n` +
+      `━━━━━━━━━━━━━━━━━━━━━\n` +
+      `📈 In:  ₹${fmt(totalIn)}\n` +
+      `📉 Out: ₹${fmt(totalOut)}\n` +
+      `💼 Net: ${netStr}\n` +
+      `━━━━━━━━━━━━━━━━━━━━━\n` +
+      `💰 *Income by source:*\n` +
+      `${incomeSection}\n` +
+      `━━━━━━━━━━━━━━━━━━━━━\n` +
+      `💸 *Top spending:*\n` +
+      `${spendSection}\n` +
+      `━━━━━━━━━━━━━━━━━━━━━\n` +
+      `Reply:\n` +
+      `*1* → drill spending category\n` +
+      `*2* → drill income source\n` +
+      `*TXN* → transaction history\n` +
+      `*PDF* → export this month\n` +
+      `*0* → back`,
+  };
+};
+
+/**
+ * Numbered list of categories for drill-down pick.
+ * @param {'spend'|'income'} type
+ * @param {Array} cats [{ category, total }]
+ */
+const smartInsightsDrillMenuMessage = (type, cats) => {
+  const icon  = type === 'income' ? '💰' : '💸';
+  const title = type === 'income' ? 'Income Sources' : 'Spending Categories';
+  const lines = cats.map((r, i) => `${i + 1}. ${emojiFor(r.category)} ${r.category}  ₹${fmt(r.total)}`).join('\n');
+  return {
+    text:
+      `${icon} *${title}*\n` +
+      `━━━━━━━━━━━━━━━━━━━━━\n` +
+      `${lines || 'No data this month.'}\n` +
+      `━━━━━━━━━━━━━━━━━━━━━\n` +
+      `_Reply with category number to see transactions_\n` +
+      `_Type *0* to go back_`,
+  };
+};
+
+// ─── Transaction Range Select ─────────────────────────────────────────────────
+
+const txnRangeSelectMessage = () => ({
+  text:
+    `📋 *Transaction History*\n` +
+    `━━━━━━━━━━━━━━━━━━━━━\n` +
+    `Pick a range:\n\n` +
+    `*1* → Today\n` +
+    `*2* → Specific date — reply *DD/MM/YYYY*\n` +
+    `*3* → Full month — reply *MM/YYYY* → sends PDF\n\n` +
+    `━━━━━━━━━━━━━━━━━━━━━\n` +
+    `_Type *0* to go back_`,
+});
+
+/**
+ * Paginated transaction list.
+ * @param {Array}  txns       Transaction docs for this page
+ * @param {number} page       1-indexed current page
+ * @param {number} totalPages
+ * @param {string} dateLabel  e.g. "08 May" or "May 2026"
+ */
+const txnPageMessage = (txns, page, totalPages, dateLabel) => {
+  const TM = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const lines = txns.map((txn) => {
+    const d    = new Date(txn.createdAt);
+    const time = `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+    const icon = txn.type === 'credit' ? '💰' : '💸';
+    const sign = txn.type === 'credit' ? '+' : '-';
+    const cat  = txn.category.padEnd(12);
+    let line   = `${icon} ${cat}  ${sign}₹${fmt(txn.amount)}  ${time}`;
+    if (txn.note) line += `\n   _${txn.note}_`;
+    return line;
+  });
+
+  const nav = totalPages > 1
+    ? `\nPage ${page}/${totalPages} — ${page < totalPages ? '*NEXT* for more' : 'last page'}${page > 1 ? ' | *PREV* for previous' : ''}`
+    : '';
+
+  return {
+    text:
+      `📋 *Transactions — ${dateLabel}*\n` +
+      `━━━━━━━━━━━━━━━━━━━━━\n\n` +
+      lines.join('\n') +
+      `\n━━━━━━━━━━━━━━━━━━━━━` +
+      nav +
+      `\n_Type *0* to cancel_`,
+  };
+};
+
+/**
+ * Paginated 5-at-a-time category selection for debit flow.
+ * @param {Array}  cats        [{name}] — the slice for this page
+ * @param {number} page        1-indexed
+ * @param {number} totalPages
+ * @param {number} pageOffset  index offset so numbering is correct
+ */
+const selectCategoryPagedMessage = (cats, page, totalPages, pageOffset) => {
+  const lines = cats.map((c, i) => `${pageOffset + i + 1}. ${emojiFor(c.name)} ${c.name}`).join('\n');
+  const nav   = [];
+  if (page < totalPages) nav.push('*NEXT* → more');
+  if (page > 1)          nav.push('*PREV* → back');
+  nav.push('*0* → cancel');
+  return {
+    text:
+      `💸 *Select category (page ${page}/${totalPages}):*\n\n` +
+      `${lines}\n\n` +
+      nav.join(' | '),
+  };
+};
+
+// ─── Categories & Budgets combined sub-menu ───────────────────────────────────
+
+const categoriesBudgetsMenuMessage = () => ({
+  text:
+    `🗂️ *Categories & Budgets*\n` +
+    `━━━━━━━━━━━━━━━━━━━━━\n` +
+    `What would you like to manage?\n\n` +
+    `1️⃣  *Spending Categories*\n` +
+    `2️⃣  *Income Categories*\n` +
+    `3️⃣  *Manage Budgets*\n\n` +
+    `━━━━━━━━━━━━━━━━━━━━━\n` +
+    `_Type *0* to go back_`,
+});
 
 // ─── Manage Budgets ───────────────────────────────────────────────────────────
 
@@ -904,6 +1059,12 @@ module.exports = {
   unrecognisedMessage,
   moreMenuMessage,
   spendingReportMessage,
+  smartInsightsMessage,
+  smartInsightsDrillMenuMessage,
+  txnRangeSelectMessage,
+  txnPageMessage,
+  selectCategoryPagedMessage,
+  categoriesBudgetsMenuMessage,
   manageBudgetsMessage,
   askBudgetAmountMessage,
   budgetSetMessage,
@@ -925,6 +1086,7 @@ module.exports = {
   withdrawConfirmedMessage,
   invalidDebitMessage,
   selectCategoryMessage,
+  selectCategoryPagedMessage,
   invalidCategoryMessage,
   negativeWarningMessage,
   negativeWithdrawConfirmedMessage,
@@ -938,6 +1100,7 @@ module.exports = {
   lastCategoryWarningMessage,
   selectIncomeCategoryMessage,
   manageCategoriesMenuMessage,
+  categoriesBudgetsMenuMessage,
   manageIncomeCategoriesMessage,
   askNewIncomeCategoryNameMessage,
   incomeCategoryCreatedMessage,
