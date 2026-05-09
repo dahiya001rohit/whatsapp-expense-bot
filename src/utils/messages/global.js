@@ -34,8 +34,19 @@ const unrecognisedMessage = () => ({
     `_Reply with a valid command to continue._`,
 });
 
+const deploymentMessage = () => ({
+  text:
+    `🚀 *SpendBot Update!*\n` +
+    `━━━━━━━━━━━━━━━━━━━━━\n` +
+    `The bot has just been updated with\n` +
+    `new features and improvements.\n` +
+    `━━━━━━━━━━━━━━━━━━━━━\n` +
+    `_Type *hi* to explore what's new!_`,
+});
+
 module.exports = {
   balanceMessage,
   cancelledMessage,
   unrecognisedMessage,
+  deploymentMessage,
 };

@@ -24,6 +24,7 @@ const { initScheduler }       = require('../scheduler/notifications');
 // ─── Shared live socket reference ────────────────────────────────────────────
 let _currentSock  = null;
 let _reconnecting = false; // guard — only one pending reconnect at a time
+let _deploymentMessageSent = false; // ensures we only announce once per server start
 
 // ─── Message deduplication (60s TTL) ─────────────────────────────────────────
 const _seenIds = new Map();
@@ -122,6 +123,21 @@ async function startBot(app) {
       _reconnecting = false;
       console.log('\n✅  WhatsApp connected! Bot is running.\n');
       initScheduler(sock);
+
+      if (!_deploymentMessageSent) {
+        _deploymentMessageSent = true;
+        const User = require('../models/User');
+        const { deploymentMessage } = require('../utils/messages');
+        User.find({ name: { $ne: null }, currentStep: { $ne: 'awaiting_name' } })
+          .then(async (users) => {
+            console.log(`🚀 Announcing update to ${users.length} onboarded users...`);
+            for (const u of users) {
+              await sock.sendMessage(`${u.phone}@s.whatsapp.net`, deploymentMessage()).catch(() => {});
+              await new Promise(r => setTimeout(r, 1000));
+            }
+          })
+          .catch(err => console.error('Failed to send deployment messages:', err));
+      }
     }
 
     if (connection === 'close') {
