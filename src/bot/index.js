@@ -132,7 +132,8 @@ async function startBot(app) {
           .then(async (users) => {
             console.log(`🚀 Announcing update to ${users.length} onboarded users...`);
             for (const u of users) {
-              await sock.sendMessage(`${u.phone}@s.whatsapp.net`, deploymentMessage()).catch(() => {});
+              const targetJid = u.jid || `${u.phone}@s.whatsapp.net`;
+              await sock.sendMessage(targetJid, deploymentMessage()).catch(() => {});
               await new Promise(r => setTimeout(r, 1000));
             }
           })
