@@ -97,14 +97,24 @@ async function handleMessage(sock, message) {
   if (!userInput) return;
 
   const phone      = jid.split('@')[0];
-  let   user       = await User.findOne({ phone });
+  let   user       = await User.findOne({ jid: jid });
+  
+  // Fallback to phone if jid is not yet saved
+  if (!user) {
+    user = await User.findOne({ phone });
+    if (user) {
+      user.jid = jid;
+      await user.save();
+    }
+  }
+
   const inputLower = userInput.toLowerCase();
   const inputUpper = userInput.toUpperCase();
 
   console.log(`📨  [${phone}] step: ${user?.currentStep ?? 'none'} | input: "${userInput}"`);
 
   if (!user) {
-    user = await User.create({ phone, currentStep: 'awaiting_name', tempData: {} });
+    user = await User.create({ phone, jid, currentStep: 'awaiting_name', tempData: {} });
     await send(sock, jid, askNameMessage());
     return;
   }

@@ -7,6 +7,11 @@ const userSchema = new mongoose.Schema({
     unique: true,
     trim: true,
   },
+  jid: {
+    type: String,
+    unique: true,
+    sparse: true,
+  },
   name: {
     type: String,
     default: null,

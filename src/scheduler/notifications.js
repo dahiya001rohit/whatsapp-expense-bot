@@ -121,7 +121,8 @@ async function sendMorningBriefing(sock) {
         `\n━━━━━━━━━━━━━━━━━━━━━\n` +
         `Have a great day! 💪`;
 
-      await sock.sendMessage(`${user.phone}@s.whatsapp.net`, { text: message });
+      const targetJid = user.jid || `${user.phone}@s.whatsapp.net`;
+      await sock.sendMessage(targetJid, { text: message });
       await new Promise((r) => setTimeout(r, 2000));
 
     } catch (err) {
@@ -190,7 +191,8 @@ async function sendNightSummary(sock) {
         `\n━━━━━━━━━━━━━━━━━━━━━\n` +
         `Rest well! 😴`;
 
-      await sock.sendMessage(`${user.phone}@s.whatsapp.net`, { text: message });
+      const targetJid = user.jid || `${user.phone}@s.whatsapp.net`;
+      await sock.sendMessage(targetJid, { text: message });
       await new Promise((r) => setTimeout(r, 2000));
 
     } catch (err) {
@@ -222,7 +224,8 @@ async function sendInactivityNudge(sock) {
         `Reply *YES* to log them\n` +
         `Reply *NO* for a quick check`;
 
-      await sock.sendMessage(`${user.phone}@s.whatsapp.net`, { text: message });
+      const targetJid = user.jid || `${user.phone}@s.whatsapp.net`;
+      await sock.sendMessage(targetJid, { text: message });
 
       user.notifStatus    = 'nudge_sent';
       user.lastNudgeSentAt = new Date();
@@ -252,7 +255,8 @@ async function sendNudgeTimeout(sock) {
         `Hope you're having a great time, *${user.name}*! 🌟\n\n` +
         `Type *hi* whenever you're ready.`;
 
-      await sock.sendMessage(`${user.phone}@s.whatsapp.net`, { text: message });
+      const targetJid = user.jid || `${user.phone}@s.whatsapp.net`;
+      await sock.sendMessage(targetJid, { text: message });
 
       user.notifStatus = 'none';
       await user.save();
