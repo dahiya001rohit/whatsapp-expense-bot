@@ -24,19 +24,7 @@ const nameRegisteredMessage = (name) => ({
     `and get started.`,
 });
 
-const askActualPhoneMessage = (name) => ({
-  text:
-    `🔒 *Privacy Settings Detected*\n` +
-    `━━━━━━━━━━━━━━━━━━━━━\n` +
-    `Hi *${name}*, WhatsApp has masked your number\n` +
-    `due to your privacy settings or connection type.\n\n` +
-    `To properly link your SpendBot account, could\n` +
-    `you please reply with your WhatsApp phone number?\n` +
-    `*(e.g., 919876543210)*`,
-});
-
 module.exports = {
   askNameMessage,
   nameRegisteredMessage,
-  askActualPhoneMessage,
 };

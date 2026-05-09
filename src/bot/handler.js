@@ -9,7 +9,7 @@ const {
   txnRangeSelectMessage, resetTypeMessage,
 } = require('../utils/messages');
 
-const { handleOnboarding, handleAwaitingActualPhone } = require('./handlers/onboarding');
+const { handleOnboarding }                    = require('./handlers/onboarding');
 const { handleMainMenu }                      = require('./handlers/mainMenu');
 const { handleAwaitingAmount, handleIncomeCategory, handleCreditNote } = require('./handlers/credit');
 const {
@@ -47,7 +47,6 @@ const PAGINATED_STATES = new Set([
 
 const DISPATCH = {
   awaiting_name:                        handleOnboarding,
-  awaiting_actual_phone:                handleAwaitingActualPhone,
   main_menu:                            handleMainMenu,
   more_menu:                            handleMoreMenu,
   awaiting_amount:                      handleAwaitingAmount,
