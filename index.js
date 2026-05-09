@@ -45,9 +45,9 @@ app.listen(PORT, () => {
 
 // ─── Self-ping — prevents Render free tier from sleeping ─────────────────────
 function keepAlive() {
-  const url = process.env.RENDER_URL;
+  const url = process.env.RENDER_EXTERNAL_URL || process.env.RENDER_URL;
   if (!url) {
-    console.log('⚠️  RENDER_URL not set — skipping keep-alive ping');
+    console.log('⚠️  RENDER_EXTERNAL_URL not set — skipping keep-alive ping');
     return;
   }
 

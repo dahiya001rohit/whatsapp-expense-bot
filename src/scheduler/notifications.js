@@ -286,9 +286,12 @@ function initScheduler(sock) {
     await sendNightSummary(_sock);
     await sendInactivityNudge(_sock);
     await sendNudgeTimeout(_sock);
+  }, {
+    scheduled: true,
+    timezone: "Asia/Kolkata"
   });
 
-  console.log('📅 Scheduler initialized');
+  console.log('📅 Scheduler initialized (Asia/Kolkata)');
 }
 
 module.exports = { initScheduler };
