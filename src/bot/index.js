@@ -177,8 +177,18 @@ async function startBot(app) {
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
     if (type !== 'notify') return;
 
+    const nowSec = Math.floor(Date.now() / 1000);
+
     for (const message of messages) {
       if (!message.key.id || isDuplicate(message.key.id)) continue;
+
+      // Drop messages older than 30 s — replayed on reconnect/restart
+      const ts = message.messageTimestamp;
+      if (ts && nowSec - ts > 30) {
+        console.log(`⏭️  Skipping stale message (${nowSec - ts}s old) id=${message.key.id}`);
+        continue;
+      }
+
       try {
         await handleMessage(sock, message);
       } catch (err) {
