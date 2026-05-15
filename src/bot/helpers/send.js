@@ -1,27 +1,25 @@
 'use strict';
 
-const humanDelay = () =>
-  new Promise((r) => setTimeout(r, 1000 + Math.random() * 1000));
+const MAX_RETRIES = 3;
 
 async function send(_sock, jid, payload) {
-  await humanDelay();
-
-  // Always use the most recently connected socket, not the one captured at
-  // message-receipt time (which may have closed mid-reconnect cycle).
   const { getSocket } = require('../index');
-  const live = getSocket() || _sock;
 
-  try {
-    await live.sendMessage(jid, { text: payload.text });
-  } catch (err) {
-    if (err?.message?.includes('Connection Closed') || err?.message?.includes('Timed Out')) {
-      await new Promise((r) => setTimeout(r, 5000));
-      const retrySocket = getSocket() || _sock;
-      await retrySocket.sendMessage(jid, { text: payload.text });
-    } else {
-      throw err;
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const live = getSocket() || _sock;
+      console.log(`📤 [attempt ${attempt}] Sending to ${jid}`);
+      const result = await live.sendMessage(jid, { text: payload.text });
+      console.log(`✅ Sent to ${jid} | msgId: ${result?.key?.id}`);
+      return result;
+    } catch (err) {
+      console.error(`❌ Send attempt ${attempt} failed:`, err.message);
+      if (attempt === MAX_RETRIES) throw err;
+      const delay = Math.pow(2, attempt) * 1000;
+      console.log(`⏳ Retrying in ${delay}ms...`);
+      await new Promise((r) => setTimeout(r, delay));
     }
   }
 }
 
-module.exports = { send, humanDelay };
+module.exports = { send };

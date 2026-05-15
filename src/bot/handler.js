@@ -45,6 +45,8 @@ const PAGINATED_STATES = new Set([
   'smart_insights_drill_income_txns',
 ]);
 
+const _processingUsers = new Set();
+
 const DISPATCH = {
   awaiting_name:                        handleOnboarding,
   main_menu:                            handleMainMenu,
@@ -96,7 +98,15 @@ async function handleMessage(sock, message) {
   const userInput = (msg.conversation || msg.extendedTextMessage?.text || '').trim();
   if (!userInput) return;
 
-  const phone      = jid.split('@')[0];
+  const phone = jid.split('@')[0];
+
+  if (_processingUsers.has(phone)) {
+    console.log(`⏭️  Already processing message from ${phone}, skipping`);
+    return;
+  }
+  _processingUsers.add(phone);
+
+  try {
   let   user       = await User.findOne({ jid: jid });
   
   // Fallback to phone if jid is not yet saved
@@ -225,6 +235,9 @@ async function handleMessage(sock, message) {
     user.currentStep = 'main_menu';
     await user.save();
     await send(sock, jid, unrecognisedMessage());
+  }
+  } finally {
+    _processingUsers.delete(phone);
   }
 }
 
