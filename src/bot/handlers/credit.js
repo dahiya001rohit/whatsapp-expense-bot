@@ -8,9 +8,13 @@ const {
   askCreditNoteMessage, depositConfirmedMessage,
 } = require('../../utils/messages');
 
+// FIXED: reject amounts above ₹1 crore and non-finite values
+const MAX_AMOUNT = 10_000_000;
+
 async function handleAwaitingAmount(sock, jid, user, phone, userInput) {
-  const amount = parseFloat(userInput);
-  if (isNaN(amount) || amount <= 0) {
+  const amount = parseFloat(userInput.trim());
+  // FIXED: guard against NaN, Infinity, zero, negative, and absurdly large amounts
+  if (isNaN(amount) || !isFinite(amount) || amount <= 0 || amount > MAX_AMOUNT) {
     await send(sock, jid, invalidDepositMessage());
     return;
   }
@@ -38,7 +42,8 @@ async function handleIncomeCategory(sock, jid, user, phone, userInput) {
 }
 
 async function handleCreditNote(sock, jid, user, phone, userInput, inputLower, inputUpper) {
-  const note        = inputUpper === 'SKIP' ? '' : userInput;
+  // FIXED: cap note at 200 chars to prevent bloated DB documents
+  const note        = inputUpper === 'SKIP' ? '' : userInput.slice(0, 200);
   const amount      = user.tempData?.pendingIncomeAmount ?? 0;
   const category    = user.tempData?.pendingIncomeCategory ?? 'Other Income';
   const prevBalance = user.balance;

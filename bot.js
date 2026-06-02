@@ -1,8 +1,9 @@
 /**
- * index.js — Legacy / local-dev entry point
+ * bot.js — FynxAI Node.js entry point
  *
- * Production uses bot.js (spawned by FastAPI) + Dockerfile.
- * This file keeps local `npm start` working with Express for the /qr endpoint.
+ * Starts Baileys WhatsApp bot + MongoDB (Mongoose).
+ * HTTP is handled by the FastAPI service (fastapi_app/main.py).
+ * This process focuses purely on the WhatsApp bot logic.
  */
 'use strict';
 
@@ -19,21 +20,21 @@ console.error = (...args) => { if (!_isSignalNoise(...args)) _origError(...args)
 const _origLog = console.log.bind(console);
 console.log = (...args) => { if (!_isSignalNoise(...args)) _origLog(...args); };
 
-// FIXED: global unhandled rejection handler
+// FIXED: global unhandled rejection handler — prevent silent crashes
 process.on('unhandledRejection', (reason) => {
   console.error('❌ Unhandled Promise Rejection:', reason);
+  // Do NOT exit — re-establishing a Baileys session is expensive
 });
+
+// FIXED: catch uncaught exceptions so process stays alive for bot reconnects
 process.on('uncaughtException', (err) => {
   console.error('❌ Uncaught Exception:', err.message, err.stack);
 });
 
-const express  = require('express');
-const https    = require('https');
-const http     = require('http');
 const mongoose = require('mongoose');
 const { startBot } = require('./src/bot/index');
 
-// FIXED: validate all required env vars on startup
+// FIXED: validate all required env vars on startup instead of crashing mid-run
 function validateEnv() {
   const required = ['MONGO_URI'];
   const missing  = required.filter((k) => !process.env[k]);
@@ -43,38 +44,7 @@ function validateEnv() {
   }
 }
 
-const app  = express();
-const PORT = process.env.PORT || 3000;
-
-app.get('/health', (_req, res) => {
-  res.status(200).json({
-    status:    'alive',
-    uptime:    process.uptime(),
-    timestamp: new Date().toISOString(),
-  });
-});
-
-app.listen(PORT, () => console.log(`🌐 Server running on port ${PORT}`));
-
-// ── Self-ping — prevents Render free tier from sleeping ───────────────────────
-function keepAlive() {
-  const url = process.env.RENDER_EXTERNAL_URL || process.env.RENDER_URL;
-  if (!url) {
-    console.log('⚠️  RENDER_EXTERNAL_URL not set — skipping keep-alive ping');
-    return;
-  }
-  const protocol = url.startsWith('https') ? https : http;
-  protocol.get(`${url}/health`, (res) => {
-    console.log(`✅ Keep-alive ping — ${res.statusCode}`);
-  }).on('error', (err) => {
-    console.log(`❌ Ping failed — ${err.message}`);
-  });
-}
-
-setInterval(keepAlive, 10 * 60 * 1_000);
-setTimeout(keepAlive,  60 * 1_000);
-
-// FIXED: exponential backoff MongoDB retry
+// FIXED: exponential backoff MongoDB retry — 2s, 4s, 8s … cap 30s
 async function connectWithRetry(maxRetries = 6) {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
@@ -83,7 +53,10 @@ async function connectWithRetry(maxRetries = 6) {
       return;
     } catch (err) {
       console.error(`❌  MongoDB attempt ${attempt}/${maxRetries} failed:`, err.message);
-      if (attempt === maxRetries) { console.error('❌  All attempts failed.'); process.exit(1); }
+      if (attempt === maxRetries) {
+        console.error('❌  All MongoDB connection attempts failed. Exiting.');
+        process.exit(1);
+      }
       const delay = Math.min(Math.pow(2, attempt) * 1_000, 30_000);
       console.log(`⏳ Retrying in ${delay / 1_000}s…`);
       await new Promise((r) => setTimeout(r, delay));
@@ -91,6 +64,7 @@ async function connectWithRetry(maxRetries = 6) {
   }
 }
 
+// FIXED: handle MongoDB disconnects after startup — log and let mongoose auto-reconnect
 mongoose.connection.on('disconnected', () => console.log('⚠️  MongoDB disconnected — auto-reconnecting…'));
 mongoose.connection.on('reconnected',  () => console.log('✅  MongoDB reconnected'));
 mongoose.connection.on('error',        (err) => console.error('❌  MongoDB error:', err.message));
@@ -98,7 +72,7 @@ mongoose.connection.on('error',        (err) => console.error('❌  MongoDB erro
 async function main() {
   validateEnv();
   await connectWithRetry();
-  await startBot(app);
+  await startBot();
 }
 
 main();

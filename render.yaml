@@ -1,15 +1,15 @@
 services:
   - type: web
-    name: spendbot
-    runtime: node
-    buildCommand: npm install
-    testCommand: npm test
-    startCommand: npm start
+    name: fynxai
+    runtime: docker
+    dockerfilePath: ./Dockerfile
     healthCheckPath: /health
     envVars:
       - key: MONGO_URI
         sync: false
-      - key: RENDER_URL
+      - key: RENDER_EXTERNAL_URL
         sync: false
+      - key: BOT_ENTRY
+        value: "bot.js"
       - key: PORT
         value: "3000"

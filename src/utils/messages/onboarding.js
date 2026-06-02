@@ -1,27 +1,17 @@
 'use strict';
 
-const { fmt } = require('./formatters');
-
 const askNameMessage = () => ({
   text:
-    `👋 *Welcome to SpendBot!*\n` +
-    `━━━━━━━━━━━━━━━━━━━━━\n` +
-    `We're glad to have you here. Let's get your\n` +
-    `account set up in just a few seconds.\n` +
-    `━━━━━━━━━━━━━━━━━━━━━\n` +
-    `Could you please tell us your *name*?`,
+    `👋 *Welcome to FynxAI!*\n\n` +
+    `Your personal finance tracker on WhatsApp.\n\n` +
+    `What's your name?`,
 });
 
 const nameRegisteredMessage = (name) => ({
   text:
-    `✅ *Account Created Successfully!*\n` +
-    `━━━━━━━━━━━━━━━━━━━━━\n` +
-    `Welcome aboard, *${name}*! 🎉\n\n` +
-    `Your account has been created with a starting\n` +
-    `balance of *₹0.00*\n` +
-    `━━━━━━━━━━━━━━━━━━━━━\n` +
-    `You're all set! Type *hi* to see your options\n` +
-    `and get started.`,
+    `✅ Hey *${name}*, you're all set! 🎉\n\n` +
+    `Starting balance: *₹0*\n\n` +
+    `Type *hi* to get started.`,
 });
 
 module.exports = {

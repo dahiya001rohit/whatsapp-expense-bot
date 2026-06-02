@@ -1,12 +1,5 @@
 'use strict';
 
-/**
- * debit.js — Handles the withdrawal / debit flow.
- *
- * Category selection is now paginated: 5 categories per page.
- * NEXT / PREV for category pagination are caught globally in handler.js.
- */
-
 const Transaction         = require('../../models/Transaction');
 const { send }            = require('../helpers/send');
 const { getCategories }   = require('../helpers/db');
@@ -14,19 +7,14 @@ const { checkBudgetAlert } = require('../helpers/budgetAlert');
 const { startOfMonth }    = require('../helpers/constants');
 const {
   invalidDebitMessage, negativeWarningMessage, askDebitNoteMessage,
-  selectCategoryPagedMessage, invalidCategoryMessage,
-  withdrawConfirmedMessage, negativeWithdrawConfirmedMessage,
-  withdrawCancelledMessage, needYesOrNoMessage,
+  selectCategoryPagedMessage, withdrawConfirmedMessage,
+  negativeWithdrawConfirmedMessage, withdrawCancelledMessage, needYesOrNoMessage,
 } = require('../../utils/messages');
 
+// FIXED: reject amounts above ₹1 crore and non-finite values
+const MAX_AMOUNT    = 10_000_000;
 const CAT_PAGE_SIZE = 10;
 
-// ── helpers ───────────────────────────────────────────────────────────────────
-
-/**
- * Sort categories by current-month spending descending.
- * Returns the same cat docs array, just reordered.
- */
 async function getCategoriesSortedBySpend(phone) {
   const [cats, spendAgg] = await Promise.all([
     getCategories(phone),
@@ -37,7 +25,6 @@ async function getCategoriesSortedBySpend(phone) {
   ]);
   const spendMap = {};
   spendAgg.forEach((r) => { spendMap[r._id] = r.total; });
-
   return cats.slice().sort((a, b) => (spendMap[b.name] ?? 0) - (spendMap[a.name] ?? 0));
 }
 
@@ -52,8 +39,9 @@ function catPageSlice(allCats, page) {
 // ── awaiting_debit_amount ─────────────────────────────────────────────────────
 
 async function handleAwaitingDebitAmount(sock, jid, user, phone, userInput) {
-  const amount = parseFloat(userInput);
-  if (isNaN(amount) || amount <= 0) {
+  const amount = parseFloat(userInput.trim());
+  // FIXED: guard against NaN, Infinity, zero, negative, and absurdly large amounts
+  if (isNaN(amount) || !isFinite(amount) || amount <= 0 || amount > MAX_AMOUNT) {
     await send(sock, jid, invalidDebitMessage(user.balance));
     return;
   }
@@ -77,12 +65,11 @@ async function handleAwaitingDebitAmount(sock, jid, user, phone, userInput) {
     return;
   }
 
-  // Store sorted category list + page state in tempData
   const { slice, safePage, totalPages, offset } = catPageSlice(allCats, 1);
   user.tempData = {
     pendingAmount: amount,
     pendingType: 'debit',
-    allCats: allCats.map((c) => c.name), // store names only (lean)
+    allCats: allCats.map((c) => c.name),
     catPage: safePage,
   };
   user.markModified('tempData');
@@ -94,15 +81,13 @@ async function handleAwaitingDebitAmount(sock, jid, user, phone, userInput) {
 // ── awaiting_category ─────────────────────────────────────────────────────────
 
 async function handleCategory(sock, jid, user, phone, userInput) {
-  const allCatNames   = user.tempData?.allCats ?? [];
-  const catPage       = user.tempData?.catPage ?? 1;
-  const totalPages    = Math.max(1, Math.ceil(allCatNames.length / CAT_PAGE_SIZE));
-  const index         = parseInt(userInput, 10);
+  const allCatNames = user.tempData?.allCats ?? [];
+  const catPage     = user.tempData?.catPage ?? 1;
+  const index       = parseInt(userInput, 10);
 
   if (isNaN(index) || index < 1 || index > allCatNames.length) {
-    const { slice, offset } = catPageSlice(allCatNames.map((n) => ({ name: n })), catPage);
     await send(sock, jid, {
-      text: `⚠️ Please reply with a number between 1 and ${allCatNames.length}.\n_Type *0* to cancel._`,
+      text: `⚠️ Enter a number between 1 and ${allCatNames.length}.\n_Type *0* to cancel._`,
     });
     return;
   }
@@ -126,12 +111,8 @@ async function handleCategory(sock, jid, user, phone, userInput) {
   await send(sock, jid, askDebitNoteMessage());
 }
 
-// ── NEXT / PREV pagination for category selection ─────────────────────────────
+// ── NEXT / PREV category pagination ──────────────────────────────────────────
 
-/**
- * Called from handler.js global catches when state = 'awaiting_category'.
- * @param {'NEXT'|'PREV'} direction
- */
 async function handleCategoryPage(sock, jid, user, phone, direction) {
   const allCatNames = user.tempData?.allCats ?? [];
   const catPage     = user.tempData?.catPage ?? 1;
@@ -139,7 +120,7 @@ async function handleCategoryPage(sock, jid, user, phone, direction) {
   const newPage     = direction === 'NEXT' ? catPage + 1 : catPage - 1;
 
   if (newPage < 1 || newPage > totalPages) {
-    await send(sock, jid, { text: `⚠️ No more pages. You're on page ${catPage}/${totalPages}.` });
+    await send(sock, jid, { text: `⚠️ You're on page ${catPage}/${totalPages}.` });
     return;
   }
 
@@ -153,7 +134,8 @@ async function handleCategoryPage(sock, jid, user, phone, direction) {
 // ── awaiting_debit_note ───────────────────────────────────────────────────────
 
 async function handleDebitNote(sock, jid, user, phone, userInput, inputLower, inputUpper) {
-  const note          = inputUpper === 'SKIP' ? '' : userInput;
+  // FIXED: cap note at 200 chars to prevent bloated DB documents
+  const note          = inputUpper === 'SKIP' ? '' : userInput.slice(0, 200);
   const pendingAmount = user.tempData?.pendingAmount ?? 0;
   const category      = user.tempData?.pendingCategory ?? 'Uncategorised';
   const prevBalance   = user.balance;

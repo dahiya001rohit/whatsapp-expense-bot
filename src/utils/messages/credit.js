@@ -3,47 +3,24 @@
 const { fmt } = require('./formatters');
 
 const askAmountMessage = () => ({
-  text:
-    `💰 *Add Money*\n` +
-    `━━━━━━━━━━━━━━━━━━━━━\n` +
-    `Please enter the amount you'd like to\n` +
-    `deposit into your account.\n` +
-    `━━━━━━━━━━━━━━━━━━━━━\n` +
-    `_Type the amount in ₹ — for example, *500*_\n` +
-    `_Type *0* to cancel this operation._`,
+  text: `💰 *Add money*\n\n_How much? (e.g. 500)_\n_Type *0* to cancel._`,
 });
 
 const depositConfirmedMessage = (amount, category, prevBal, newBal) => ({
   text:
-    `✅ *Deposit Successful!*\n` +
-    `━━━━━━━━━━━━━━━━━━━━━\n` +
-    `Amount Deposited:   *₹${fmt(amount)}*\n` +
-    `Category:           *${category}*\n` +
-    `Previous Balance:   *₹${fmt(prevBal)}*\n` +
-    `Current Balance:    *₹${fmt(newBal)}*\n` +
-    `━━━━━━━━━━━━━━━━━━━━━\n` +
-    `_Type *hi* for menu or *MORE* for options._`,
+    `✅ *+₹${fmt(amount)}* · ${category}\n` +
+    `Balance: *₹${fmt(newBal)}*`,
 });
 
 const invalidDepositMessage = () => ({
   text:
-    `⚠️ *Invalid Amount*\n` +
-    `━━━━━━━━━━━━━━━━━━━━━\n` +
-    `That doesn't look like a valid number.\n` +
-    `Please enter a positive amount in ₹.\n` +
-    `━━━━━━━━━━━━━━━━━━━━━\n` +
-    `_For example, type *500* to deposit ₹500_\n` +
+    `⚠️ Enter a valid amount in ₹ (e.g. *500*)\n` +
+    `Max: ₹1,00,00,000 · must be positive\n` +
     `_Type *0* to cancel._`,
 });
 
 const askCreditNoteMessage = () => ({
-  text:
-    `📝 *Add a Note?*\n` +
-    `━━━━━━━━━━━━━━━━━━━━━\n` +
-    `You can add a note to this deposit.\n` +
-    `_(e.g. 'monthly salary')_\n` +
-    `━━━━━━━━━━━━━━━━━━━━━\n` +
-    `_Type your note, or type *SKIP* to skip._`,
+  text: `📝 Add a note? (optional)\n\n_Type your note or *SKIP*_`,
 });
 
 module.exports = {

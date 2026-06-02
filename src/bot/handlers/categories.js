@@ -6,15 +6,17 @@ const Budget         = require('../../models/Budget');
 const { send }       = require('../helpers/send');
 const { getCategories, getIncomeCategories } = require('../helpers/db');
 const {
-  manageCategoriesMessage, manageCategoriesMenuMessage, manageIncomeCategoriesMessage,
-  askNewCategoryNameMessage, categoryCreatedMessage, askDeleteCategoryMessage,
-  categoryDeletedMessage, lastCategoryWarningMessage, invalidCategoryMessage,
-  askNewIncomeCategoryNameMessage, incomeCategoryCreatedMessage,
+  categoriesBudgetsMenuMessage, manageCategoriesMessage, manageCategoriesMenuMessage,
+  manageIncomeCategoriesMessage, askNewCategoryNameMessage, categoryCreatedMessage,
+  askDeleteCategoryMessage, categoryDeletedMessage, lastCategoryWarningMessage,
+  invalidCategoryMessage, askNewIncomeCategoryNameMessage, incomeCategoryCreatedMessage,
   askDeleteIncomeCategoryMessage, incomeCategoryDeletedMessage, cancelledMessage,
-  categoriesBudgetsMenuMessage, manageBudgetsMessage,
+  manageBudgetsMessage,
 } = require('../../utils/messages');
 
-async function handleManageCategories(sock, jid, user, phone, userInput) {
+// ── categories_budgets_menu ───────────────────────────────────────────────────
+
+async function handleCategoriesBudgetsMenu(sock, jid, user, phone, userInput) {
   if (userInput === '1') {
     const cats = await getCategories(phone);
     user.currentStep = 'manage_spending_categories';
@@ -26,7 +28,7 @@ async function handleManageCategories(sock, jid, user, phone, userInput) {
     await user.save();
     await send(sock, jid, manageIncomeCategoriesMessage(cats));
   } else if (userInput === '3') {
-    // Manage Budgets
+    const Budget = require('../../models/Budget');
     const cats    = await getCategories(phone);
     const budgets = await Budget.find({ phone });
     const budgetMap = {};
@@ -41,9 +43,33 @@ async function handleManageCategories(sock, jid, user, phone, userInput) {
     await user.save();
     await send(sock, jid, cancelledMessage(user.balance));
   } else {
+    await send(sock, jid, categoriesBudgetsMenuMessage());
+  }
+}
+
+// ── manage_categories ─────────────────────────────────────────────────────────
+
+async function handleManageCategories(sock, jid, user, phone, userInput) {
+  if (userInput === '1') {
+    const cats = await getCategories(phone);
+    user.currentStep = 'manage_spending_categories';
+    await user.save();
+    await send(sock, jid, manageCategoriesMessage(cats));
+  } else if (userInput === '2') {
+    const cats = await getIncomeCategories(phone);
+    user.currentStep = 'manage_income_categories';
+    await user.save();
+    await send(sock, jid, manageIncomeCategoriesMessage(cats));
+  } else if (userInput === '0') {
+    user.currentStep = 'main_menu';
+    await user.save();
+    await send(sock, jid, cancelledMessage(user.balance));
+  } else {
     await send(sock, jid, manageCategoriesMenuMessage());
   }
 }
+
+// ── manage_spending_categories ────────────────────────────────────────────────
 
 async function handleManageSpendingCategories(sock, jid, user, phone, userInput, inputLower, inputUpper) {
   if (inputUpper === 'ADD') {
@@ -65,14 +91,26 @@ async function handleManageSpendingCategories(sock, jid, user, phone, userInput,
   }
 }
 
+// ── awaiting_new_category_name ────────────────────────────────────────────────
+
 async function handleNewCategoryName(sock, jid, user, phone, userInput) {
+  // FIXED: trim whitespace before validation and storage
   const catName = userInput.trim();
   if (catName.length === 0) {
-    await send(sock, jid, { text: '⚠️ Category name cannot be empty.\n\nPlease enter a valid name:\n_Type *0* to cancel_' });
+    await send(sock, jid, { text: `⚠️ Category name can't be empty.\n_Type *0* to cancel._` });
     return;
   }
   if (catName.length > 30) {
-    await send(sock, jid, { text: '⚠️ Category name too long.\n\nPlease keep it under 30 characters:\n_Type *0* to cancel_' });
+    await send(sock, jid, { text: `⚠️ Keep it under 30 characters.\n_Type *0* to cancel._` });
+    return;
+  }
+  // FIXED: case-insensitive duplicate check to prevent near-duplicate categories
+  const existing = await Category.findOne({
+    phone,
+    name: { $regex: new RegExp(`^${catName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+  });
+  if (existing) {
+    await send(sock, jid, { text: `⚠️ *${catName}* already exists.\n_Type a different name or *0* to cancel._` });
     return;
   }
   await Category.create({ phone, name: catName });
@@ -81,6 +119,8 @@ async function handleNewCategoryName(sock, jid, user, phone, userInput) {
   await user.save();
   await send(sock, jid, categoryCreatedMessage(catName, updatedCats));
 }
+
+// ── awaiting_delete_category ──────────────────────────────────────────────────
 
 async function handleDeleteCategory(sock, jid, user, phone, userInput) {
   const cats  = await getCategories(phone);
@@ -100,6 +140,8 @@ async function handleDeleteCategory(sock, jid, user, phone, userInput) {
   await user.save();
   await send(sock, jid, categoryDeletedMessage(target.name, updatedCats));
 }
+
+// ── manage_income_categories ──────────────────────────────────────────────────
 
 async function handleManageIncomeCategories(sock, jid, user, phone, userInput, inputLower, inputUpper) {
   if (inputUpper === 'ADD') {
@@ -121,14 +163,26 @@ async function handleManageIncomeCategories(sock, jid, user, phone, userInput, i
   }
 }
 
+// ── awaiting_new_income_category ──────────────────────────────────────────────
+
 async function handleNewIncomeCategory(sock, jid, user, phone, userInput) {
+  // FIXED: trim whitespace before validation and storage
   const catName = userInput.trim();
   if (catName.length === 0) {
-    await send(sock, jid, { text: '⚠️ Category name cannot be empty.\n\nPlease enter a valid name:\n_Type *0* to cancel_' });
+    await send(sock, jid, { text: `⚠️ Category name can't be empty.\n_Type *0* to cancel._` });
     return;
   }
   if (catName.length > 30) {
-    await send(sock, jid, { text: '⚠️ Category name too long.\n\nPlease keep it under 30 characters:\n_Type *0* to cancel_' });
+    await send(sock, jid, { text: `⚠️ Keep it under 30 characters.\n_Type *0* to cancel._` });
+    return;
+  }
+  // FIXED: case-insensitive duplicate check
+  const existing = await IncomeCategory.findOne({
+    phone,
+    name: { $regex: new RegExp(`^${catName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+  });
+  if (existing) {
+    await send(sock, jid, { text: `⚠️ *${catName}* already exists.\n_Type a different name or *0* to cancel._` });
     return;
   }
   await IncomeCategory.create({ phone, name: catName });
@@ -137,6 +191,8 @@ async function handleNewIncomeCategory(sock, jid, user, phone, userInput) {
   await user.save();
   await send(sock, jid, incomeCategoryCreatedMessage(catName, updatedCats));
 }
+
+// ── awaiting_delete_income_category ──────────────────────────────────────────
 
 async function handleDeleteIncomeCategory(sock, jid, user, phone, userInput) {
   const cats  = await getIncomeCategories(phone);
@@ -157,44 +213,9 @@ async function handleDeleteIncomeCategory(sock, jid, user, phone, userInput) {
   await send(sock, jid, incomeCategoryDeletedMessage(target.name, updatedCats));
 }
 
-/**
- * Handles the new `categories_budgets_menu` state.
- * Options: 1=Spending Cats, 2=Income Cats, 3=Manage Budgets, 0=Back
- */
-async function handleCategoriesBudgetsMenu(sock, jid, user, phone, userInput) {
-  if (userInput === '1') {
-    const cats = await getCategories(phone);
-    user.currentStep = 'manage_spending_categories';
-    await user.save();
-    await send(sock, jid, manageCategoriesMessage(cats));
-  } else if (userInput === '2') {
-    const cats = await getIncomeCategories(phone);
-    user.currentStep = 'manage_income_categories';
-    await user.save();
-    await send(sock, jid, manageIncomeCategoriesMessage(cats));
-  } else if (userInput === '3') {
-    const cats    = await getCategories(phone);
-    const budgets = await Budget.find({ phone });
-    const budgetMap = {};
-    budgets.forEach((b) => { budgetMap[b.category] = b.limit; });
-    user.currentStep = 'manage_budgets';
-    user.tempData    = { budgetCats: cats.map((c) => c.name) };
-    user.markModified('tempData');
-    await user.save();
-    await send(sock, jid, manageBudgetsMessage(cats, budgetMap));
-  } else if (userInput === '0') {
-    user.currentStep = 'more_menu';
-    await user.save();
-    const { moreMenuMessage } = require('../../utils/messages');
-    await send(sock, jid, moreMenuMessage());
-  } else {
-    await send(sock, jid, categoriesBudgetsMenuMessage());
-  }
-}
-
 module.exports = {
   handleCategoriesBudgetsMenu,
-  handleManageCategories, handleManageSpendingCategories, handleNewCategoryName,
-  handleDeleteCategory, handleManageIncomeCategories, handleNewIncomeCategory,
-  handleDeleteIncomeCategory,
+  handleManageCategories, handleManageSpendingCategories,
+  handleNewCategoryName, handleDeleteCategory,
+  handleManageIncomeCategories, handleNewIncomeCategory, handleDeleteIncomeCategory,
 };
