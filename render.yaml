@@ -1,15 +1,14 @@
 services:
   - type: web
     name: fynxai
-    runtime: docker
-    dockerfilePath: ./Dockerfile
+    runtime: node
+    buildCommand: npm install
+    startCommand: npm start
     healthCheckPath: /health
     envVars:
       - key: MONGO_URI
         sync: false
       - key: RENDER_EXTERNAL_URL
         sync: false
-      - key: BOT_ENTRY
-        value: "bot.js"
       - key: PORT
         value: "3000"
