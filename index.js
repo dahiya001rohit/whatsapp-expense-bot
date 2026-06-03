@@ -31,7 +31,8 @@ const express  = require('express');
 const https    = require('https');
 const http     = require('http');
 const mongoose = require('mongoose');
-const { startBot } = require('./src/bot/index');
+const { startBot, getCurrentQR } = require('./src/bot/index');
+const qrTerminal = require('qrcode-terminal');
 
 // FIXED: validate all required env vars on startup
 function validateEnv() {
@@ -51,6 +52,20 @@ app.get('/health', (_req, res) => {
     status:    'alive',
     uptime:    process.uptime(),
     timestamp: new Date().toISOString(),
+  });
+});
+
+app.get('/qr', (_req, res) => {
+  const qr = getCurrentQR();
+  if (!qr) {
+    // Bot is either connected or hasn't generated a QR yet
+    const connected = require('./src/bot/index').getSocket()?.user != null;
+    return res.json({ status: connected ? 'connected' : 'waiting_for_qr' });
+  }
+  // Return terminal-format QR as plain text (visible in Render logs + browser)
+  qrTerminal.generate(qr, { small: true }, (qrText) => {
+    res.setHeader('Content-Type', 'text/plain');
+    res.send(`📱 Scan to connect WhatsApp:\n\n${qrText}`);
   });
 });
 

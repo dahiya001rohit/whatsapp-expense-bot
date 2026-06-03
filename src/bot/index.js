@@ -14,7 +14,8 @@ const {
   fetchLatestBaileysVersion,
 } = require('@whiskeysockets/baileys');
 
-const pino = require('pino');
+const pino      = require('pino');
+const qrTerminal = require('qrcode-terminal');
 
 const { useMongoDBAuthState } = require('../utils/mongoAuthState');
 const { handleMessage }       = require('./handler');
@@ -23,6 +24,7 @@ const { initScheduler }       = require('../scheduler/notifications');
 // ── Shared live socket reference ──────────────────────────────────────────────
 let _currentSock    = null;
 let _reconnectTimer = null;
+let currentQR       = null; // latest QR string; null when connected or not yet generated
 
 // FIXED: exponential backoff state — resets to 1s on successful connect
 let _reconnectDelay        = 1_000;
@@ -86,9 +88,12 @@ async function startBot() {
   // ── QR / connection events ──────────────────────────────────────────────────
   sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
     if (qr) {
-      await writeQrToMongo(qr); // FIXED: persist QR for FastAPI to serve
+      currentQR = qr;
+      await writeQrToMongo(qr); // persist QR for FastAPI /qr endpoint
+      qrTerminal.generate(qr, { small: true }); // print scannable QR to terminal/Render logs
+      console.log('📱 Scan QR code above to connect WhatsApp');
       const base = process.env.RENDER_EXTERNAL_URL || `http://localhost:${process.env.PORT || 3000}`;
-      console.log(`\n📱  QR ready — open to scan:\n    ${base}/qr\n`);
+      console.log(`   (also available at ${base}/qr)`);
     }
 
     if (connection === 'open') {
@@ -173,4 +178,6 @@ async function _sendDeploymentMessages(sock) {
   }
 }
 
-module.exports = { startBot, getSocket };
+function getCurrentQR() { return currentQR; }
+
+module.exports = { startBot, getSocket, getCurrentQR };
